@@ -304,7 +304,7 @@ with tabs[0]:
 
     # ── USD → USDC/USDT Calculator ──
     st.markdown("##### Calculadora USD → USDC/USDT → ARS")
-    default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450
+    default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
     col1, col2 = st.columns(2)
     with col1:
         fci_usd = st.number_input("USD que compraste", value=855.0, step=10.0, format="%.2f", key="fci_usd")
@@ -402,10 +402,11 @@ def render_fiat(wallets_only):
 
     # Search/Filter
     col1, col2 = st.columns(2)
+    prefix = "wal" if wallets_only else "bank"
     with col1:
-        q = st.text_input("🔍 Buscar", placeholder="Nombre...", label_visibility="collapsed")
+        q = st.text_input("🔍 Buscar", placeholder="Nombre...", label_visibility="collapsed", key=f"{prefix}_search")
     with col2:
-        solo_247 = st.checkbox("24/7", value=False)
+        solo_247 = st.checkbox("24/7", value=False, key=f"{prefix}_247")
 
     if q:
         ql = q.lower()
@@ -559,7 +560,7 @@ with tabs[7]:
                 f_tasa = st.number_input("Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f")
             with c2:
                 f_comision = st.number_input("Comisión %", value=0.50, step=0.01, format="%.2f")
-                f_venta = st.number_input("Precio venta USDC/USDT", value=float(default_venta if 'default_venta' in dir() else 1450), step=1.0)
+                f_venta = st.number_input("Precio venta USDC/USDT", value=float(default_venta), step=1.0)
                 f_exchange = st.text_input("Exchange", value="Lemon")
             f_fecha = st.date_input("Fecha", value=datetime.now())
 
