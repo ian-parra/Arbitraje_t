@@ -417,7 +417,6 @@ def render_fiat(wallets_only):
         items = [v for v in items if v['type']=='billetera']
     items.sort(key=lambda x: x.get('bid',0), reverse=True)
 
-    st.markdown("##### KPIs")
     bids = [x['bid'] for x in items if x['bid']]
     asks = [x['ask'] for x in items if x['ask'] and x['ask']>0]
     spreads = [x['ask']-x['bid'] for x in items if x['ask'] and x['bid']]
@@ -428,7 +427,6 @@ def render_fiat(wallets_only):
     with k3: st.metric("Spread promedio", f"${sum(spreads)/len(spreads):.2f}" if spreads else '—')
     with k4: st.metric("Entidades", str(len(items)))
 
-    # Search/Filter
     col1, col2 = st.columns(2)
     prefix = "wal" if wallets_only else "bank"
     with col1:
@@ -442,23 +440,77 @@ def render_fiat(wallets_only):
     if solo_247:
         items = [x for x in items if x['is_247']]
 
+    max_bid = max(x['bid'] for x in items if x['bid']) if any(x['bid'] for x in items) else 0
     for item in items:
-        bid = item['bid']
-        ask = item['ask']
-        col1, col2 = st.columns([1,3])
-        with col1:
-            st.markdown(f"**{item['name']}**{' 🔵 CCL' if item['ccl'] else ''}")
-            st.caption(f"_{item['source']}_")
-        with col2:
-            if ask:
-                st.markdown(f"**Compra:** {fmt(ask)}")
-            if bid:
-                st.markdown(f"**Venta:** {fmt(bid)}")
-            if ask and bid:
-                sp = ask-bid
-                st.markdown(f"Spread: ${sp:.2f}")
+        bid = item['bid']; ask = item['ask']
+        is_best = bid == max_bid and bid > 0
+        pct = (bid / max_bid * 100) if max_bid > 0 else 0
+        st.markdown(f"""
+<div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+<div style="flex:2">
+<div style="font-size:13px;font-weight:600;color:#ecedf5">{item['name']}{' <span style="font-size:9px;color:#5da8ff;font-weight:400">🔵 CCL</span>' if item['ccl'] else ''}{' <span style="font-size:9px;color:#29e8a0">⭐ Mejor</span>' if is_best else ''}</div>
+<div style="font-size:10px;color:#484a5c;margin-top:1px">{item['source']}{' · 24/7' if item['is_247'] else ''}</div>
+</div>
+<div style="flex:1;text-align:right">
+<div style="font-size:10px;color:#484a5c">Compra</div>
+<div style="font-size:13px;font-weight:600;color:#f5b946">{fmt(ask) if ask else '—'}</div>
+</div>
+<div style="flex:1;text-align:right">
+<div style="font-size:10px;color:#484a5c">Venta</div>
+<div style="font-size:13px;font-weight:600">{fmt(bid) if bid else '—'}</div>
+</div>
+<div style="flex:0.8;text-align:right">
+<div style="font-size:10px;color:#484a5c">Spread</div>
+<div style="font-size:12px;font-weight:600;color:{'#29e8a0' if bid and ask and ask-bid<50 else '#f2566b' if bid and ask else '#484a5c'}">${ask-bid:.0f}</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
 
-        st.divider()
+def render_crypto(asset, data):
+    coin = asset.upper()
+    items = [{'slug':s,'name':s[0].upper()+s[1:].replace('p2p',' P2P').replace('exchange',''),
+        'ask':d.get('ask',0) or 0,'bid':d.get('bid',0) or 0,'totalAsk':d.get('totalAsk',0) or 0,'totalBid':d.get('totalBid',0) or 0,'time':d.get('time',0) or 0}
+        for s,d in data.items() if isinstance(d,dict) and s not in ('wexx','weeexp2p')]
+    items = [x for x in items if x['ask'] or x['bid']]
+    items.sort(key=lambda x: x['bid'], reverse=True)
+
+    asks = [x['ask'] for x in items if x['ask']]
+    bids = [x['bid'] for x in items if x['bid']]
+    min_ask = min(asks) if asks else 0
+    max_bid = max(bids) if bids else 0
+
+    k1,k2,k3,k4 = st.columns(4)
+    with k1: st.metric(f"Mejor compra {coin}", fmt(min_ask) if min_ask else '—')
+    with k2: st.metric(f"Mejor venta {coin}", fmt(max_bid) if max_bid else '—')
+    avg_spread = sum(x['ask']-x['bid'] for x in items if x['ask'] and x['bid'])/max(len([x for x in items if x['ask'] and x['bid']]),1)
+    with k3: st.metric("Spread promedio", f"${avg_spread:.2f}")
+    with k4: st.metric("Exchanges", str(len(items)))
+
+    for item in items:
+        has_ask = item['ask']>0; has_bid = item['bid']>0
+        best_buy = has_ask and item['ask']==min_ask
+        best_sell = has_bid and item['bid']==max_bid
+        spread = (item['ask']-item['bid']) if has_ask and has_bid else 0
+        age = datetime.fromtimestamp(item['time']) if item['time'] else None
+        badges = []
+        if best_buy: badges.append('<span style="font-size:9px;color:#f5b946">🟢 Mejor compra</span>')
+        if best_sell: badges.append('<span style="font-size:9px;color:#29e8a0">💚 Mejor venta</span>')
+        badge_str = (' ').join(badges)
+
+        st.markdown(f"""
+<div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<span style="font-size:13px;font-weight:600;color:#ecedf5">{item['name']}</span>
+<span style="font-size:10px;color:#484a5c">{age.strftime("%H:%M") if age else ''}</span>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><div style="font-size:9px;color:#484a5c">Compra</div><div style="font-size:14px;font-weight:600;color:{'#f5b946' if best_buy else '#ecedf5'}">{fmt(item['ask']) if has_ask else '—'}</div></div>
+<div><div style="font-size:9px;color:#484a5c">Venta</div><div style="font-size:14px;font-weight:600;color:{'#29e8a0' if best_sell else '#ecedf5'}">{fmt(item['bid']) if has_bid else '—'}</div></div>
+<div><div style="font-size:9px;color:#484a5c">Spread</div><div style="font-size:12px;font-weight:600;color:{'#29e8a0' if spread<50 else '#f2566b' if spread>100 else '#f5b946'}">${spread:.0f}</div></div>
+<div style="text-align:right">{badge_str}</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
 
 with tabs[1]:
     st.markdown("### 🏦 Bancos")
@@ -515,6 +567,7 @@ def render_crypto(asset, data):
 
 with tabs[2]:
     st.markdown("### USDT")
+    render_crypto('USDT', c_usdt_ars)
 with tabs[3]:
     st.markdown("### USDC")
     render_crypto('USDC', c_usdc_ars)
