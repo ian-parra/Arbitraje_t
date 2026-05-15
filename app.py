@@ -321,29 +321,55 @@ with tabs[0]:
 
     # ── USD → USDC/USDT Calculator ──
     st.markdown("##### Calculadora USD → USDC/USDT → ARS")
-    default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
-    st.caption("Simulá la ganancia de comprar dólar oficial, convertir a USDC/USDT y vender en exchange crypto.")
-    col1, col2 = st.columns(2)
-    with col1:
-        fci_usd = st.number_input("💵 USD comprados", value=855.0, step=10.0, format="%.2f", key="fci_usd", help="Cantidad de dólares que compraste al oficial")
+
+    # Build exchange rate options
+    exchange_opts = {}
+    if isinstance(c_usdc_usd, dict):
+        for slug, d in c_usdc_usd.items():
+            if isinstance(d, dict) and d.get('ask', 0) > 0:
+                name = slug[0].upper() + slug[1:].replace('p2p', ' P2P')
+                exchange_opts[f"{name} ({d['ask']:.4f})"] = d['ask']
+    exchange_opts["Manual"] = 0.9527
+    wallet_names = list(exchange_opts.keys())
+    default_wallet_idx = next((i for i, w in enumerate(wallet_names) if w.lower().startswith('l')), 0)
+    default_wallet_idx = len(wallet_names) - 1 if default_wallet_idx == 0 and wallet_names else 0
+
+    st.markdown("""
+    <div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;margin:10px 0">
+    """, unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        fci_usd = st.number_input("💵 USD comprados", value=1000.0, step=100.0, format="%.2f", key="fci_usd", help="Cantidad de dólares que compraste al oficial")
         fci_oficial = st.number_input("🇦🇷 Cotización oficial (ARS/USD)", value=float(o_venta or 1405), step=1.0, key="fci_oficial", help="Ej: 1405")
-    with col2:
-        fci_tasa = st.number_input("🔄 Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f", key="fci_tasa", help="Cuántos USDC/USDT recibís por USD (Lemon ~0.9527, ideal=1.0)")
+    with c2:
+        sel_wallet = st.selectbox("🏦 Exchange / Billetera", options=wallet_names, index=default_wallet_idx, key="sel_wallet", help="Seleccioná un exchange para auto-completar la tasa, o elegí Manual")
+        auto_rate = exchange_opts.get(sel_wallet, 0.9527)
+        is_auto = sel_wallet != "Manual"
+        if is_auto:
+            st.caption(f"Tasa {sel_wallet}")
+        fci_tasa = st.number_input("🔄 Tasa USD→USDC/USDT", value=auto_rate, step=0.001, format="%.4f", key="fci_tasa", help="Cuántos USDC/USDT recibís por USD. Se auto-completa al seleccionar un exchange.")
         fci_venta = st.number_input(f"💱 Precio venta ARS", value=float(default_venta), step=1.0, key="fci_venta", help=f"ARS que te pagan por 1 USDC/USDT (ej: {float(default_venta):.0f})")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
     inv = fci_usd * fci_oficial
     rec = fci_usd * fci_tasa
     ars_rec = rec * fci_venta
     gan = ars_rec - inv
     gan_pct = gan/inv*100 if inv>0 else 0
+    gan_color = "#29e8a0" if gan >= 0 else "#f2566b"
 
-    k1,k2,k3,k4 = st.columns(4)
-    with k1: st.metric("Invertiste (ARS)", fmt_short(inv))
-    with k2: st.metric("Recibís USDC/USDT", f"{rec:.2f}")
-    with k3: st.metric("ARS al vender", fmt_short(ars_rec))
-    with k4:
-        st.metric("Ganancia", f"{'+' if gan>=0 else ''}{fmt_short(gan)} ({gan_pct:.2f}%)",
-            delta_color="normal" if gan>=0 else "inverse")
+    st.markdown(f"""
+    <div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;margin:10px 0">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+    <div><div style="font-size:10px;color:#484a5c;margin-bottom:4px">Invertiste (ARS)</div><div style="font-size:16px;font-weight:700">{fmt_short(inv)}</div></div>
+    <div><div style="font-size:10px;color:#484a5c;margin-bottom:4px">Recibís USDC/USDT</div><div style="font-size:16px;font-weight:700;color:#f5b946">{rec:.2f}</div></div>
+    <div><div style="font-size:10px;color:#484a5c;margin-bottom:4px">ARS al vender</div><div style="font-size:16px;font-weight:700;color:#5da8ff">{fmt_short(ars_rec)}</div></div>
+    <div><div style="font-size:10px;color:#484a5c;margin-bottom:4px">Ganancia</div><div style="font-size:16px;font-weight:700;color:{gan_color}">{'+' if gan>=0 else ''}{fmt_short(gan)} ({gan_pct:.2f}%)</div></div>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════
 # TAB 1-2: BILLETERAS / BANCOS
