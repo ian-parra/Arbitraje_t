@@ -164,31 +164,6 @@ default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
 # TAB 0: PERLITAS
 # ════════════════════════════════════════
 with tabs[0]:
-    st.markdown("### 💎 Perlitas de Hoy")
-
-    # KPIs
-    k1,k2,k3,k4,k5,k6 = st.columns(6)
-    with k1: st.metric("🇺🇸 Dólar Oficial", fmt(o_venta), help="Venta")
-    with k2: st.metric("🇺🇸 Blue", fmt(blue_compra), help="Compra")
-    with k3: st.metric("📈 MEP", fmt(mep_compra), help="Compra")
-    with k4: st.metric("🌎 CCL", fmt(ccl_compra), help="Compra")
-    with k5: st.metric("💶 Euro", fmt(eur_venta), help="Venta")
-    with k6:
-        spread = ((blue_compra/o_venta)-1)*100 if o_venta>0 and blue_compra>0 else 0
-        st.metric("📊 Spread", f"{spread:.2f}%" if spread else '—', help="Blue vs Oficial")
-
-    # Quick facts
-    facts = []
-    if best_usdt_sell:
-        facts.append(f"{best_usdt_sell['name']} paga {fmt(best_usdt_sell['bid'])} por USDT")
-    if best_usdc_sell:
-        facts.append(f"{best_usdc_sell['name']} paga {fmt(best_usdc_sell['bid'])} por USDC")
-    if best_usdt_buy:
-        facts.append(f"Comprar USDT más barato: {best_usdt_buy['name']} a {fmt(best_usdt_buy['ask'])}")
-    if facts:
-        st.caption(" · ".join(facts))
-
-    st.divider()
 
     # ── ARBITRAGE ROUTES ──
     st.markdown("##### Rutas de arbitraje")
