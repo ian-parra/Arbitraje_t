@@ -105,8 +105,10 @@ st.title("CambioAR", anchor=False)
 
 # ── Sidebar config ──
 st.sidebar.markdown("### ⚙️ Configuración")
-refresh_min = st.sidebar.slider("Auto-refresh (minutos)", 1, 30, 5, key="refresh_slider")
-st.sidebar.caption(f"Se actualiza cada {refresh_min} min")
+if st.sidebar.button("🔄 Refrescar datos", use_container_width=True, type="primary"):
+    st.cache_data.clear()
+    st.rerun()
+st.sidebar.caption("Limpia caché y vuelve a consultar APIs")
 
 # ── Last updated ──
 _ts = datetime.now()
@@ -342,22 +344,6 @@ with tabs[0]:
     with k4:
         st.metric("Ganancia", f"{'+' if gan>=0 else ''}{fmt_short(gan)} ({gan_pct:.2f}%)",
             delta_color="normal" if gan>=0 else "inverse")
-
-    if usdc_ex:
-        st.caption("Comparativa por exchange (vendiendo tus stablecoins al mejor bid):")
-        ex_data = []
-        for x in usdc_ex[:10]:
-            val = rec * x['bid']
-            ex_data.append({"Exchange": x['name'], "ARS": val, "Bid": x['bid']})
-        df = pd.DataFrame(ex_data).sort_values("ARS", ascending=False)
-        df['%'] = df['ARS'] / df['ARS'].max() * 100
-        st.dataframe(df, use_container_width=True, hide_index=True,
-            column_config={
-                "Exchange": st.column_config.TextColumn("Exchange"),
-                "Bid": st.column_config.NumberColumn("Bid", format="$%.2f"),
-                "ARS": st.column_config.ProgressColumn("ARS", format="$%.0f", min_value=df['ARS'].min(), max_value=df['ARS'].max()),
-                "%": st.column_config.NumberColumn("% del mejor", format="%.1f%%")
-            })
 
 # ════════════════════════════════════════
 # TAB 1-2: BILLETERAS / BANCOS
