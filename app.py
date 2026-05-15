@@ -330,11 +330,11 @@ with tabs[0]:
     if isinstance(c_usdc_usd, dict):
         items = [(slug, d) for slug, d in c_usdc_usd.items() if isinstance(d, dict) and d.get('ask', 0) > 0]
         items.sort(key=lambda x: x[1]['ask'])
-        min_rate = items[0][1]['ask'] if items else 0
+        min_ask = items[0][1]['ask'] if items else 1.0
         for slug, d in items:
             name = slug[0].upper() + slug[1:].replace('p2p', ' P2P')
-            rate = d['ask']
-            star = "⭐ " if rate == min_rate else ""
+            rate = 1.0 / d['ask']
+            star = "⭐ " if d['ask'] == min_ask else ""
             buy_opts[f"{star}{name} ({rate:.4f})"] = rate
     buy_opts["✏️  Manual"] = 0.9527
     buy_names = list(buy_opts.keys())
