@@ -235,20 +235,6 @@ with tabs[0]:
             ['Comprás USD al oficial',f'Depositás en {best_usdc_usd_name} → USDC (ratio {ratio:.4f})',f'Vendés USDC a {fmt(best_usdc_sell["bid"])} en {best_usdc_sell["name"]}'],
             pct, best_usdc_sell['bid']-eff, '1-3 días', 'mid', o_venta, best_usdc_sell['bid'], 4, {'ratio':ratio}))
 
-    # 5. USDT → USDC
-    if best_usdt_buy and best_usdc_sell and best_usdc_sell['bid'] > best_usdt_buy['ask']:
-        pct = (best_usdc_sell['bid']/best_usdt_buy['ask']-1)*100
-        routes.append(render_arb_card('USDT → USDC',
-            [f'Comprás USDT a {fmt(best_usdt_buy["ask"])} en {best_usdt_buy["name"]}','Transferís USDT→USDC (~1:1)',f'Vendés USDC a {fmt(best_usdc_sell["bid"])} en {best_usdc_sell["name"]}'],
-            pct, best_usdc_sell['bid']-best_usdt_buy['ask'], '~15 min', 'low', best_usdt_buy['ask'], best_usdc_sell['bid'], 5))
-
-    # 6. USDC → USDT
-    if best_usdc_buy and best_usdt_sell and best_usdt_sell['bid'] > best_usdc_buy['ask']:
-        pct = (best_usdt_sell['bid']/best_usdc_buy['ask']-1)*100
-        routes.append(render_arb_card('USDC → USDT',
-            [f'Comprás USDC a {fmt(best_usdc_buy["ask"])} en {best_usdc_buy["name"]}','Transferís USDC→USDT (~1:1)',f'Vendés USDT a {fmt(best_usdt_sell["bid"])} en {best_usdt_sell["name"]}'],
-            pct, best_usdt_sell['bid']-best_usdc_buy['ask'], '~15 min', 'low', best_usdc_buy['ask'], best_usdt_sell['bid'], 6))
-
     # 7. MEP → Blue
     if mep_compra>0 and blue_compra>0:
         pct = (blue_compra/mep_compra-1)*100
@@ -266,6 +252,22 @@ with tabs[0]:
         def render_route_card(r, arb_amt):
             gs = r['gain_pct']
             pos = gs >= 0
+            color = '#29e8a0' if pos else '#f2566b'
+            if not pos:
+                st.markdown(f"""
+<div style="background:#0f1016;border:1px solid rgba(242,86,107,.12);border-radius:14px;padding:14px;margin-bottom:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+<span style="font-size:12px;font-weight:600">{r['route']}</span>
+<span style="font-family:monospace;font-size:16px;font-weight:700;color:#f2566b">{gs:.2f}%</span>
+</div>
+<div style="font-size:11px;color:#858699;margin-bottom:6px">{r['steps'][0]}<br>{r['steps'][1]}<br>{r['steps'][2]}</div>
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span style="background:rgba(242,86,107,.12);color:#f2566b;border:1px solid rgba(242,86,107,.3);border-radius:6px;padding:2px 10px;font-size:11px;font-weight:600">❌ No rinde</span>
+<span style="font-size:9px;color:#858699">⏱ {r['time']}</span>
+</div>
+</div>
+""", unsafe_allow_html=True)
+                return
             usd = arb_amt / r['buy'] if r['buy'] > 0 else 0
             if r['conv'] and r['conv'].get('ratio'):
                 usdt_amt = usd / r['conv']['ratio']
@@ -308,14 +310,10 @@ with tabs[0]:
 </div>
 """, unsafe_allow_html=True)
 
-        show_neg_divider = True
         all_routes = pos_routes + neg_routes
         cols = st.columns(2)
         for i, r in enumerate(all_routes):
             with cols[i % 2]:
-                if r['gain_pct'] < 0 and show_neg_divider:
-                    st.markdown("<div style='grid-column:1/-1;margin:8px 0 4px'><span style='font-size:11px;color:#484a5c'>⚠ Rutas con pérdida (no recomendadas)</span></div>", unsafe_allow_html=True)
-                    show_neg_divider = False
                 render_route_card(r, arb_amt)
     else:
         st.info("No se detectaron oportunidades de arbitraje rentables.")
