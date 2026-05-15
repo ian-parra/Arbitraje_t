@@ -39,30 +39,21 @@ def get(url):
     except: return {}
 
 def fmt(v):
-    if not v and v!=0: return '—'
+    if v is None or v == 0: return '—'
     return f"${v:,.2f}"
 
 def fmt_short(v):
-    if not v and v!=0: return '—'
+    if v is None or v == 0: return '—'
     return f"${v:,.0f}"
 
 def render_arb_card(route, steps, gain_pct, gain_pesos, time_val, risk, buy, sell, idx, conv=None):
     pos = gain_pct >= 0
     risk_colors = {'low':'#29e8a0','mid':'#f5b946','high':'#f2566b'}
     risk_labels = {'low':'Bajo riesgo','mid':'Riesgo medio','high':'Alto riesgo'}
-    rc = risk_colors.get(risk,'#484a5c')
-    rl = risk_labels.get(risk,'')
-    border = f"1px solid {'rgba(41,232,160,.15)' if pos else 'rgba(242,86,107,.12)'}"
-    icon = "🟢" if pos else "🔴"
-    c = st.columns([1,1,1,1])
-    with c[0]: st.metric("Invertís", f"$1M")
-    with c[1]: st.metric("Obtenés", "—")
-    if conv:
-        with c[2]: st.metric("USDT/USDC", "—")
-    with c[-1]: st.metric("Recibís", "—")
     return {
         'route':route, 'steps':steps, 'gain_pct':gain_pct, 'gain_pesos':gain_pesos,
-        'time':time_val, 'risk':risk, 'risk_label':rl, 'risk_color':rc,
+        'time':time_val, 'risk':risk, 'risk_label':risk_labels.get(risk,''),
+        'risk_color':risk_colors.get(risk,'#484a5c'),
         'buy':buy, 'sell':sell, 'pos':pos, 'idx':idx, 'conv':conv
     }
 
@@ -106,8 +97,21 @@ hr { margin: 0 !important; border-color: rgba(255,255,255,.06) !important; }
 .worst { color: #f2566b !important; }
 .gain { color: #29e8a0; }
 .loss { color: #f2566b; }
+.error-badge { display: inline-block; background: rgba(242,86,107,.12); border: 1px solid rgba(242,86,107,.3); border-radius: 4px; padding: 1px 6px; font-size: 9px; color: #f2566b; font-family: 'JetBrains Mono', monospace; }
 </style>
 """, unsafe_allow_html=True)
+
+st.title("CambioAR", anchor=False)
+
+# ── Sidebar config ──
+st.sidebar.markdown("### ⚙️ Configuración")
+refresh_min = st.sidebar.slider("Auto-refresh (minutos)", 1, 30, 5, key="refresh_slider")
+st.sidebar.caption(f"Se actualiza cada {refresh_min} min")
+
+# ── Last updated ──
+_ts = datetime.now()
+st.sidebar.markdown("---")
+st.sidebar.caption(f"🕐 Actualizado: {_ts.strftime('%H:%M:%S')}")
 
 # ════════════════════════════════════════
 # FETCH ALL DATA
@@ -159,19 +163,14 @@ with tabs[0]:
 
     # KPIs
     k1,k2,k3,k4,k5,k6 = st.columns(6)
-    with k1:
-        st.metric("🇺🇸 Dólar Oficial", fmt(o_venta), help="Venta")
-    with k2:
-        st.metric("🇺🇸 Blue", fmt(blue_compra), help="Compra")
-    with k3:
-        st.metric("📈 MEP", fmt(mep_compra), help="Compra")
-    with k4:
-        st.metric("🌎 CCL", fmt(ccl_compra), help="Compra")
-    with k5:
-        st.metric("💶 Euro", fmt(eur_venta), help="Venta")
+    with k1: st.metric("🇺🇸 Dólar Oficial", fmt(o_venta), help="Venta")
+    with k2: st.metric("🇺🇸 Blue", fmt(blue_compra), help="Compra")
+    with k3: st.metric("📈 MEP", fmt(mep_compra), help="Compra")
+    with k4: st.metric("🌎 CCL", fmt(ccl_compra), help="Compra")
+    with k5: st.metric("💶 Euro", fmt(eur_venta), help="Venta")
     with k6:
-        spread = ((blue_compra/o_venta)-1)*100 if o_venta>0 else 0
-        st.metric("📊 Spread", f"{spread:.2f}%", help="Blue vs Oficial")
+        spread = ((blue_compra/o_venta)-1)*100 if o_venta>0 and blue_compra>0 else 0
+        st.metric("📊 Spread", f"{spread:.2f}%" if spread else '—', help="Blue vs Oficial")
 
     # Quick facts
     facts = []
@@ -256,20 +255,24 @@ with tabs[0]:
     routes.sort(key=lambda r: r['gain_pct'], reverse=True)
 
     if routes:
-        cols = st.columns(2)
-        for i, r in enumerate(routes):
-            with cols[i%2]:
-                gs = r['gain_pct']
-                pos = gs>=0
-                usd = arb_amt/r['buy'] if r['buy']>0 else 0
-                if r['conv'] and r['conv'].get('ratio'):
-                    usdt_amt = usd / r['conv']['ratio']
-                    final = usdt_amt * r['sell'] if r['sell']>0 else 0
-                else:
-                    final = usd * r['sell'] if r['sell']>0 else 0
-                diff = final-arb_amt
-                color = '#29e8a0' if pos else '#f2566b'
-                st.markdown(f"""
+        pos_routes = [r for r in routes if r['gain_pct'] >= 0]
+        neg_routes = [r for r in routes if r['gain_pct'] < 0]
+
+        def render_route_card(r, arb_amt):
+            gs = r['gain_pct']
+            pos = gs >= 0
+            usd = arb_amt / r['buy'] if r['buy'] > 0 else 0
+            if r['conv'] and r['conv'].get('ratio'):
+                usdt_amt = usd / r['conv']['ratio']
+                final = usdt_amt * r['sell'] if r['sell'] > 0 else 0
+            else:
+                usdt_amt = None
+                final = usd * r['sell'] if r['sell'] > 0 else 0
+            diff = final - arb_amt
+            color = '#29e8a0' if pos else '#f2566b'
+            cols_grid = '1fr 1fr 1fr' if not usdt_amt else '1fr 1fr 1fr 1fr'
+            obten_val = f"{usdt_amt:.2f} USDT/USDC" if usdt_amt else f"{usd:.0f} USD"
+            st.markdown(f"""
 <div style="background:#0f1016;border:1px solid {'rgba(41,232,160,.15)' if pos else 'rgba(242,86,107,.12)'};border-radius:14px;padding:16px;margin-bottom:10px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span style="font-size:12px;font-weight:600">{r['route']}</span>
@@ -281,14 +284,16 @@ with tabs[0]:
 {r['steps'][2]}
 </div>
 <div style="background:#1d1f2b;border-radius:10px;padding:10px;margin-bottom:8px">
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center">
+<div style="display:grid;grid-template-columns:{cols_grid};gap:6px;text-align:center">
 <div><div style="font-size:9px;color:#484a5c">Invertís</div><div style="font-size:13px;font-weight:600">{fmt_short(arb_amt)}</div></div>
-<div><div style="font-size:9px;color:#484a5c">Obtenés</div><div style="font-size:13px;font-weight:600;color:#f5b946">{usd:.0f} USD</div></div>
+<div><div style="font-size:9px;color:#484a5c">Obtenés</div><div style="font-size:13px;font-weight:600;color:#f5b946">{obten_val}</div></div>
+{f'<div><div style="font-size:9px;color:#484a5c">USDT/USDC</div><div style="font-size:13px;font-weight:600;color:#a78bfa">{usdt_amt:.2f}</div></div>' if usdt_amt else ''}
 <div><div style="font-size:9px;color:#484a5c">Recibís</div><div style="font-size:13px;font-weight:600;color:#5da8ff">{fmt_short(final)}</div></div>
 </div>
 <div style="margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,.06);text-align:center">
 <span style="font-size:11px;color:#484a5c">Ganancia: </span>
 <span style="font-size:14px;font-weight:700;color:{'#29e8a0' if diff>=0 else '#f2566b'}">{'+' if diff>=0 else ''}{fmt_short(diff)}</span>
+{f'<div style="font-size:9px;color:#858699;margin-top:2px">ℹ️ Spread negativo — la ruta genera pérdida. Buscá mejor cotización.</div>' if not pos else ''}
 </div>
 </div>
 <div style="display:flex;justify-content:space-between;font-size:9px;color:#858699">
@@ -297,6 +302,16 @@ with tabs[0]:
 </div>
 </div>
 """, unsafe_allow_html=True)
+
+        show_neg_divider = True
+        all_routes = pos_routes + neg_routes
+        cols = st.columns(2)
+        for i, r in enumerate(all_routes):
+            with cols[i % 2]:
+                if r['gain_pct'] < 0 and show_neg_divider:
+                    st.markdown("<div style='grid-column:1/-1;margin:8px 0 4px'><span style='font-size:11px;color:#484a5c'>⚠ Rutas con pérdida (no recomendadas)</span></div>", unsafe_allow_html=True)
+                    show_neg_divider = False
+                render_route_card(r, arb_amt)
     else:
         st.info("No se detectaron oportunidades de arbitraje rentables.")
 
@@ -305,13 +320,14 @@ with tabs[0]:
     # ── USD → USDC/USDT Calculator ──
     st.markdown("##### Calculadora USD → USDC/USDT → ARS")
     default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
+    st.caption("Simulá la ganancia de comprar dólar oficial, convertir a USDC/USDT y vender en exchange crypto.")
     col1, col2 = st.columns(2)
     with col1:
-        fci_usd = st.number_input("USD que compraste", value=855.0, step=10.0, format="%.2f", key="fci_usd")
-        fci_oficial = st.number_input("Precio dólar oficial (ARS/USD)", value=float(o_venta or 1405), step=1.0, key="fci_oficial")
+        fci_usd = st.number_input("💵 USD comprados", value=855.0, step=10.0, format="%.2f", key="fci_usd", help="Cantidad de dólares que compraste al oficial")
+        fci_oficial = st.number_input("🇦🇷 Cotización oficial (ARS/USD)", value=float(o_venta or 1405), step=1.0, key="fci_oficial", help="Ej: 1405")
     with col2:
-        fci_tasa = st.number_input("Tasa USD→USDC o USDT", value=0.9527, step=0.001, format="%.4f", key="fci_tasa")
-        fci_venta = st.number_input(f"Precio venta USDC/USDT (ARS)", value=float(default_venta), step=1.0, key="fci_venta")
+        fci_tasa = st.number_input("🔄 Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f", key="fci_tasa", help="Cuántos USDC/USDT recibís por USD (Lemon ~0.9527, ideal=1.0)")
+        fci_venta = st.number_input(f"💱 Precio venta ARS", value=float(default_venta), step=1.0, key="fci_venta", help=f"ARS que te pagan por 1 USDC/USDT (ej: {float(default_venta):.0f})")
 
     inv = fci_usd * fci_oficial
     rec = fci_usd * fci_tasa
@@ -320,7 +336,7 @@ with tabs[0]:
     gan_pct = gan/inv*100 if inv>0 else 0
 
     k1,k2,k3,k4 = st.columns(4)
-    with k1: st.metric("Invertiste", fmt_short(inv))
+    with k1: st.metric("Invertiste (ARS)", fmt_short(inv))
     with k2: st.metric("Recibís USDC/USDT", f"{rec:.2f}")
     with k3: st.metric("ARS al vender", fmt_short(ars_rec))
     with k4:
@@ -328,14 +344,20 @@ with tabs[0]:
             delta_color="normal" if gan>=0 else "inverse")
 
     if usdc_ex:
-        st.caption("ARS por exchange vendiendo al mejor bid:")
+        st.caption("Comparativa por exchange (vendiendo tus stablecoins al mejor bid):")
         ex_data = []
         for x in usdc_ex[:10]:
             val = rec * x['bid']
-            ex_data.append({"Exchange": x['name'], "ARS": val})
-        df = pd.DataFrame(ex_data)
-        st.dataframe(df.sort_values("ARS", ascending=False), use_container_width=True, hide_index=True,
-            column_config={"ARS": st.column_config.NumberColumn(format="$%.0f")})
+            ex_data.append({"Exchange": x['name'], "ARS": val, "Bid": x['bid']})
+        df = pd.DataFrame(ex_data).sort_values("ARS", ascending=False)
+        df['%'] = df['ARS'] / df['ARS'].max() * 100
+        st.dataframe(df, use_container_width=True, hide_index=True,
+            column_config={
+                "Exchange": st.column_config.TextColumn("Exchange"),
+                "Bid": st.column_config.NumberColumn("Bid", format="$%.2f"),
+                "ARS": st.column_config.ProgressColumn("ARS", format="$%.0f", min_value=df['ARS'].min(), max_value=df['ARS'].max()),
+                "%": st.column_config.NumberColumn("% del mejor", format="%.1f%%")
+            })
 
 # ════════════════════════════════════════
 # TAB 1-2: BILLETERAS / BANCOS
@@ -548,23 +570,21 @@ with tabs[6]:
 with tabs[7]:
     st.markdown("### 📊 Mis Vueltas")
 
-    if st.button("➕ Agregar vuelta", use_container_width=True):
-        st.session_state._show_form = not st.session_state.get('_show_form', False)
-
-    if st.session_state.get('_show_form', False):
+    # Form always visible at top
+    with st.expander("➕ Nueva vuelta", expanded=True):
         with st.form("vuelta_form", clear_on_submit=True):
             c1,c2 = st.columns(2)
             with c1:
-                f_pesos = st.number_input("Pesos invertidos", value=1_000_000.0, step=100_000.0, format="%.2f")
-                f_cotizacion = st.number_input("Cotización compra USD", value=float(o_venta or 1400), step=1.0)
-                f_tasa = st.number_input("Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f")
+                f_pesos = st.number_input("Inversión (ARS)", value=1_000_000.0, step=100_000.0, format="%.2f")
+                f_cotizacion = st.number_input("Cotización compra USD oficial", value=float(o_venta or 1400), step=1.0)
+                f_tasa = st.number_input("Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f", help="Ej: Lemon cobra ~4.7%, tasa ~0.9527. Si no usás stablecoin, poné 1.0")
             with c2:
-                f_comision = st.number_input("Comisión %", value=0.50, step=0.01, format="%.2f")
-                f_venta = st.number_input("Precio venta USDC/USDT", value=float(default_venta), step=1.0)
+                f_comision = st.number_input("Comisión del exchange %", value=0.50, step=0.01, format="%.2f", help="Comisión que te cobra el exchange al vender (ej: 0.5%)")
+                f_venta = st.number_input("Precio venta USDC/USDT (ARS)", value=float(default_venta), step=1.0)
                 f_exchange = st.text_input("Exchange", value="Lemon")
             f_fecha = st.date_input("Fecha", value=datetime.now())
 
-            if st.form_submit_button("Guardar"):
+            if st.form_submit_button("💾 Guardar vuelta"):
                 v = {
                     'id': str(uuid.uuid4())[:8],
                     'fecha': f_fecha.strftime("%Y-%m-%d"),
@@ -577,8 +597,89 @@ with tabs[7]:
                 }
                 st.session_state.vueltas.append(v)
                 save_json(VUELTAS_FILE, st.session_state.vueltas)
-                st.session_state._show_form = False
                 st.rerun()
+
+    vueltas = st.session_state.vueltas
+    if not vueltas:
+        st.info("Todavía no registraste ninguna vuelta.")
+    else:
+        # Stats
+        pcts = []; total_in = 0; total_out = 0
+        best_idx = 0; best_p = -999
+        for i, v in enumerate(vueltas):
+            _, _, ars, gan, p = calc_vuelta(v)
+            pcts.append(p)
+            total_in += v['pesosInicial']
+            total_out += ars
+            if p > best_p: best_p = p; best_idx = i
+
+        k1,k2,k3,k4 = st.columns(4)
+        with k1: st.metric("Vueltas", str(len(vueltas)))
+        with k2: st.metric("Promedio %", f"{np.mean(pcts):.3f}%" if pcts else '—')
+        with k3: st.metric("Total invertido", fmt_short(total_in))
+        with k4:
+            gan_total = total_out - total_in
+            st.metric("Ganancia total", f"{'+' if gan_total>=0 else ''}{fmt_short(gan_total)}",
+                delta=f"{gan_total/total_in*100:.2f}%" if total_in>0 else '')
+
+        # Chart
+        st.divider()
+        chart_data = []
+        for i, v in enumerate(vueltas):
+            _, usdc, ars, gan, p = calc_vuelta(v)
+            chart_data.append({'Vuelta':i+1,'Ganancia ARS':gan,'%':p})
+        df = pd.DataFrame(chart_data)
+        fig = px.bar(df, x='Vuelta', y='Ganancia ARS', text='%',
+            labels={'Ganancia ARS':'Ganancia (ARS)','Vuelta':'Vuelta #'},
+            color=['#29e8a0' if x>=0 else '#f2566b' for x in df['Ganancia ARS']],
+            color_discrete_map="identity")
+        fig.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+        fig.update_layout(height=300, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Table
+        st.divider()
+        st.markdown("##### Historial")
+        table_data = []
+        for i, v in enumerate(reversed(vueltas)):
+            usd, usdc, ars, gan, p = calc_vuelta(v)
+            is_best = (len(vueltas)-1-i) == best_idx
+            best_star = " ⭐" if is_best else ""
+            table_data.append({
+                '#': f"{len(vueltas)-i}",
+                'Fecha': v['fecha'],
+                'Inv. (ARS)': f"${v['pesosInicial']:,.0f}",
+                'USD': f"{usd:.2f}",
+                'USDC': f"{usdc:.2f}",
+                'ARS Rec.': f"${ars:,.0f}",
+                '%': f"{p:.2f}%{' ⭐' if is_best else ''}",
+                'Gan.': f"{'$'+f'{gan:,.0f}' if gan>=0 else '-$'+f'{abs(gan):,.0f}'}",
+                'Exchange': v.get('exchange','')
+            })
+        df2 = pd.DataFrame(table_data)
+        st.dataframe(df2, use_container_width=True, hide_index=True)
+
+        # Exports
+        c1,c2 = st.columns(2)
+        with c1:
+            csv_data = "Fecha,PesosInicial,CotizacionCompra,TasaConversion,Comision,PrecioVenta,Exchange\n"
+            for v in vueltas:
+                csv_data += f"{v['fecha']},{v['pesosInicial']},{v['cotizacionCompra']},{v['tasaConversion']},{v['comisionPct']},{v['precioVenta']},{v.get('exchange','')}\n"
+            st.download_button("📥 Exportar CSV", data=csv_data, file_name="mis-vueltas.csv", mime="text/csv", use_container_width=True)
+        with c2:
+            json_str = json.dumps(vueltas, indent=2, ensure_ascii=False)
+            st.download_button("📥 Exportar JSON", data=json_str, file_name="mis-vueltas.json", mime="application/json", use_container_width=True)
+
+        st.divider()
+        st.markdown("##### Eliminar vuelta")
+        del_id = st.selectbox("Seleccionar vuelta a eliminar",
+            options=[(i, f"#{i+1} - {v['fecha']} ${v['pesosInicial']:,.0f}") for i,v in enumerate(vueltas)],
+            format_func=lambda x: x[1])
+        if st.button("🗑 Eliminar", use_container_width=True):
+            idx = del_id[0]
+            st.session_state.vueltas.pop(idx)
+            save_json(VUELTAS_FILE, st.session_state.vueltas)
+            st.rerun()
 
     vueltas = st.session_state.vueltas
     if not vueltas:
