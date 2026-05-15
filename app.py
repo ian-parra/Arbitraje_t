@@ -323,17 +323,20 @@ with tabs[0]:
     st.markdown("##### Calculadora USD → USDC/USDT → ARS")
     default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
 
-    # Build exchange rate options
+    # Build exchange rate options sorted by rate ascending (best first)
     exchange_opts = {}
     if isinstance(c_usdc_usd, dict):
-        for slug, d in c_usdc_usd.items():
-            if isinstance(d, dict) and d.get('ask', 0) > 0:
-                name = slug[0].upper() + slug[1:].replace('p2p', ' P2P')
-                exchange_opts[f"{name} ({d['ask']:.4f})"] = d['ask']
-    exchange_opts["Manual"] = 0.9527
+        items = [(slug, d) for slug, d in c_usdc_usd.items() if isinstance(d, dict) and d.get('ask', 0) > 0]
+        items.sort(key=lambda x: x[1]['ask'])
+        min_rate = items[0][1]['ask'] if items else 0
+        for slug, d in items:
+            name = slug[0].upper() + slug[1:].replace('p2p', ' P2P')
+            rate = d['ask']
+            star = "⭐ " if rate == min_rate else ""
+            exchange_opts[f"{star}{name} ({rate:.4f})"] = rate
+    exchange_opts["✏️  Manual"] = 0.9527
     wallet_names = list(exchange_opts.keys())
-    default_wallet_idx = next((i for i, w in enumerate(wallet_names) if w.lower().startswith('l')), 0)
-    default_wallet_idx = len(wallet_names) - 1 if default_wallet_idx == 0 and wallet_names else 0
+    default_wallet_idx = next((i for i, w in enumerate(wallet_names) if '⭐' in w), len(wallet_names) - 1)
 
     st.markdown("""
     <div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:18px;margin:10px 0">
@@ -345,11 +348,19 @@ with tabs[0]:
         fci_oficial = st.number_input("🇦🇷 Cotización oficial (ARS/USD)", value=float(o_venta or 1405), step=1.0, key="fci_oficial", help="Ej: 1405")
     with c2:
         sel_wallet = st.selectbox("🏦 Exchange / Billetera", options=wallet_names, index=default_wallet_idx, key="sel_wallet", help="Seleccioná un exchange para auto-completar la tasa, o elegí Manual")
-        auto_rate = exchange_opts.get(sel_wallet, 0.9527)
-        is_auto = sel_wallet != "Manual"
-        if is_auto:
-            st.caption(f"Tasa {sel_wallet}")
-        fci_tasa = st.number_input("🔄 Tasa USD→USDC/USDT", value=auto_rate, step=0.001, format="%.4f", key="fci_tasa", help="Cuántos USDC/USDT recibís por USD. Se auto-completa al seleccionar un exchange.")
+        is_manual = "Manual" in sel_wallet
+        if is_manual:
+            fci_tasa = st.number_input("🔄 Tasa USD→USDC/USDT (manual)", value=exchange_opts.get(sel_wallet, 0.9527), step=0.001, format="%.4f", key="fci_tasa_manual", help="Cuántos USDC/USDT recibís por USD")
+        else:
+            auto_rate = exchange_opts.get(sel_wallet, 0.9527)
+            fci_tasa = auto_rate
+            st.markdown(f"""
+            <div style="background:#1d1f2b;border-radius:8px;padding:6px 12px;margin-bottom:10px">
+            <span style="font-size:10px;color:#484a5c">🔄 Tasa USD→USDC/USDT</span><br>
+            <span style="font-size:14px;font-weight:600;color:#a78bfa">{auto_rate:.4f}</span>
+            <span style="font-size:10px;color:#484a5c;margin-left:6px">(auto — {sel_wallet.split('(')[0].strip()})</span>
+            </div>
+            """, unsafe_allow_html=True)
         fci_venta = st.number_input(f"💱 Precio venta ARS", value=float(default_venta), step=1.0, key="fci_venta", help=f"ARS que te pagan por 1 USDC/USDT (ej: {float(default_venta):.0f})")
 
     st.markdown("</div>", unsafe_allow_html=True)
