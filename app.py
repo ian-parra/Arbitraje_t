@@ -321,6 +321,7 @@ with tabs[0]:
 
     # ── USD → USDC/USDT Calculator ──
     st.markdown("##### Calculadora USD → USDC/USDT → ARS")
+    default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
 
     # Build exchange rate options
     exchange_opts = {}
