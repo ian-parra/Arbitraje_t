@@ -155,7 +155,7 @@ usdc_usd_best = sorted([(s,d['ask']) for s,d in c_usdc_usd.items() if isinstance
 best_usdc_usd_rate = usdc_usd_best[0][1] if usdc_usd_best else 1.0
 best_usdc_usd_name = usdc_usd_best[0][0][0].upper()+usdc_usd_best[0][0][1:].replace('p2p',' P2P') if usdc_usd_best else 'Binance'
 
-tabs = st.tabs(["💎 Perlitas","👛 Billeteras","🏦 Bancos","USDT","USDC","💵 Dólares","🇧🇷 BRL","📊 Mis Vueltas","🔔 Alertas"])
+tabs = st.tabs(["💎 Perlitas","🏦 Bancos","USDT","USDC","📊 Mis Vueltas","🔔 Alertas"])
 
 # Global default for sell price used across tabs
 default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
@@ -366,7 +366,7 @@ with tabs[0]:
     """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════
-# TAB 1-2: BILLETERAS / BANCOS
+# TAB 1: BANCOS
 # ════════════════════════════════════════
 def render_fiat(wallets_only):
     merged = {}
@@ -461,15 +461,11 @@ def render_fiat(wallets_only):
         st.divider()
 
 with tabs[1]:
-    st.markdown("### 👛 Billeteras")
-    render_fiat(wallets_only=True)
-
-with tabs[2]:
     st.markdown("### 🏦 Bancos")
     render_fiat(wallets_only=False)
 
 # ════════════════════════════════════════
-# TAB 3-4: USDT / USDC
+# TAB 2-3: USDT / USDC
 # ════════════════════════════════════════
 def render_crypto(asset, data):
     coin = asset.upper()
@@ -517,63 +513,16 @@ def render_crypto(asset, data):
             st.caption(f"Spread: ${spread:.2f}")
         st.divider()
 
-with tabs[3]:
+with tabs[2]:
     st.markdown("### USDT")
-    render_crypto('USDT', c_usdt_ars)
-
-with tabs[4]:
+with tabs[3]:
     st.markdown("### USDC")
     render_crypto('USDC', c_usdc_ars)
 
 # ════════════════════════════════════════
-# TAB 5: DÓLARES
+# TAB 4: MIS VUELTAS
 # ════════════════════════════════════════
-with tabs[5]:
-    st.markdown("### 💵 Dólares")
-    rates = {'Oficial':o_compra,'Blue':blue_compra,'MEP':mep_compra,'CCL':ccl_compra}
-    cols = st.columns(len(rates))
-    for i,(nm,val) in enumerate(rates.items()):
-        with cols[i]:
-            st.metric(nm, fmt(val))
-
-    # Historical or other rates from cotizaciones
-    if isinstance(d_cotizaciones, list):
-        others = [c for c in d_cotizaciones if isinstance(c,dict) and c.get('moneda') not in ('EUR',)]
-        if others:
-            st.divider()
-            st.markdown("##### Otras monedas")
-            for c in others:
-                st.markdown(f"**{c.get('moneda','?')}** — Compra: {fmt(c.get('compra',0))} | Venta: {fmt(c.get('venta',0))}")
-
-# ════════════════════════════════════════
-# TAB 6: BRL
-# ════════════════════════════════════════
-with tabs[6]:
-    st.markdown("### 🇧🇷 Real Brasileño")
-    brl_data = get(f"{CRIPTOYA}/BRL/ARS/1")
-    if isinstance(brl_data, dict) and brl_data:
-        items = [{'slug':s,'name':s[0].upper()+s[1:],'bid':d.get('bid',0) or 0,'ask':d.get('ask',0) or 0}
-            for s,d in brl_data.items() if isinstance(d,dict)]
-        items.sort(key=lambda x: x['bid'], reverse=True)
-        for item in items:
-            bid = item['bid']; ask = item['ask']
-            compra = max(bid,ask); venta = min(bid,ask)
-            c1,c2,c3 = st.columns([2,1,1])
-            with c1: st.markdown(f"**{item['name']}**")
-            with c2: st.markdown(f"Compra: {fmt(compra)}")
-            with c3: st.markdown(f"Venta: {fmt(venta)}")
-            st.divider()
-    else:
-        brl_dolar = get(f"{DOLARAPI}/exchanges/monedas/brl/ars")
-        if isinstance(brl_dolar, dict):
-            compra = max(brl_dolar.get('compra',0) or 0, brl_dolar.get('venta',0) or 0)
-            venta = min(brl_dolar.get('compra',0) or 0, brl_dolar.get('venta',0) or 0)
-            st.metric("BRL → ARS (DolarApi)", f"Compra: {fmt(compra)} | Venta: {fmt(venta)}")
-
-# ════════════════════════════════════════
-# TAB 7: MIS VUELTAS
-# ════════════════════════════════════════
-with tabs[7]:
+with tabs[4]:
     st.markdown("### 📊 Mis Vueltas")
 
     # Form always visible at top
@@ -767,9 +716,9 @@ with tabs[7]:
             st.rerun()
 
 # ════════════════════════════════════════
-# TAB 8: ALERTAS
+# TAB 5: ALERTAS
 # ════════════════════════════════════════
-with tabs[8]:
+with tabs[5]:
     st.markdown("### 🔔 Alertas de precio")
     st.info("Las alertas verifican cotizaciones cada 60 segundos contra las APIs.")
 
