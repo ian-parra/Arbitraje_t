@@ -385,6 +385,7 @@ with tabs[1]:
                 f_comision = st.number_input("Comisión del exchange %", value=0.50, step=0.01, format="%.2f", help="Comisión que te cobra el exchange al vender (ej: 0.5%)")
                 f_venta = st.number_input("Precio venta USDC/USDT (ARS)", value=float(default_venta), step=1.0)
                 f_exchange = st.text_input("Exchange", value="Lemon")
+            f_notas = st.text_area("Notas / observaciones", placeholder="precios, mejoras, ideas…")
             f_fecha = st.date_input("Fecha", value=datetime.now())
 
             if st.form_submit_button("💾 Guardar vuelta"):
@@ -396,7 +397,8 @@ with tabs[1]:
                     'tasaConversion': f_tasa,
                     'comisionPct': f_comision,
                     'precioVenta': f_venta,
-                    'exchange': f_exchange
+                    'exchange': f_exchange,
+                    'notas': f_notas
                 }
                 st.session_state.vueltas.append(v)
                 save_json(VUELTAS_FILE, st.session_state.vueltas)
@@ -448,6 +450,7 @@ with tabs[1]:
             usd, usdc, ars, gan, p = calc_vuelta(v)
             is_best = (len(vueltas)-1-i) == best_idx
             best_star = " ⭐" if is_best else ""
+            notas = v.get('notas','')
             table_data.append({
                 '#': f"{len(vueltas)-i}",
                 'Fecha': v['fecha'],
@@ -457,7 +460,8 @@ with tabs[1]:
                 'ARS Rec.': f"${ars:,.0f}",
                 '%': f"{p:.2f}%{' ⭐' if is_best else ''}",
                 'Gan.': f"{'$'+f'{gan:,.0f}' if gan>=0 else '-$'+f'{abs(gan):,.0f}'}",
-                'Exchange': v.get('exchange','')
+                'Exchange': v.get('exchange',''),
+                'Notas': notas[:40] + ('…' if len(notas)>40 else '') if notas else ''
             })
         df2 = pd.DataFrame(table_data)
         st.dataframe(df2, use_container_width=True, hide_index=True)
@@ -482,6 +486,18 @@ with tabs[1]:
             idx = del_id[0]
             st.session_state.vueltas.pop(idx)
             save_json(VUELTAS_FILE, st.session_state.vueltas)
+            st.rerun()
+
+        st.divider()
+        st.markdown("##### 📝 Notas de vuelta")
+        note_idx = st.selectbox("Seleccionar vuelta",
+            options=[(i, f"#{i+1} - {v['fecha']} ${v['pesosInicial']:,.0f}") for i,v in enumerate(vueltas)],
+            format_func=lambda x: x[1], key="note_sel")
+        current_notes = vueltas[note_idx[0]].get('notas','')
+        new_notes = st.text_area("Editar notas", value=current_notes, key="note_edit")
+        if st.button("💾 Guardar notas", use_container_width=True):
+            vueltas[note_idx[0]]['notas'] = new_notes
+            save_json(VUELTAS_FILE, vueltas)
             st.rerun()
 
 # ════════════════════════════════════════
