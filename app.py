@@ -586,10 +586,15 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 triggered_count += 1
                 if not was_fired:
                     new_triggers += 1
-                    st.toast(f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)})")
+                    extra = ""
+                    if a['type'] == 'usdt_ars' and best_usdt_sell:
+                        extra = f" | Mejor USDT: {best_usdt_sell['name']} ${best_usdt_sell['bid']:,.2f}"
+                    elif a['type'] == 'usdc_ars' and best_usdc_sell:
+                        extra = f" | Mejor USDC: {best_usdc_sell['name']} ${best_usdc_sell['bid']:,.2f}"
+                    msg = f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)}){extra}"
+                    st.toast(msg)
                     if ntfy_topic:
                         try:
-                            msg = f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)})"
                             requests.post(f"https://ntfy.sh/{ntfy_topic}", data=msg.encode(), timeout=5)
                         except:
                             pass
