@@ -123,27 +123,67 @@ if 'user' not in st.session_state:
         pass
 
 if not st.session_state.user:
-    st.markdown("### 🔐 CambioAR")
-    with st.form("auth_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Contraseña", type="password")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.form_submit_button("🔑 Iniciar sesión", use_container_width=True):
-                try:
-                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    st.session_state.user = res.user
-                    st.session_state._access_token = res.session.access_token if res.session else None
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        with c2:
-            if st.form_submit_button("📝 Registrarse", use_container_width=True):
-                try:
-                    res = supabase.auth.sign_up({"email": email, "password": password})
-                    st.success("Revisá tu email para confirmar el registro.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+    st.markdown("""
+    <style>
+    .auth-card {
+        max-width: 400px; margin: 60px auto; padding: 36px 32px 28px;
+        background: #161720; border: 1px solid rgba(255,255,255,.08);
+        border-radius: 16px; text-align: center;
+    }
+    .auth-card h1 { font-size: 24px; margin-bottom: 2px; color: #ecedf5; }
+    .auth-card .sub { font-size: 13px; color: #858699; margin-bottom: 28px; }
+    .auth-card label { color: #858699; font-size: 12px; margin-bottom: 4px; display: block; text-align: left; }
+    div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; }
+    div[data-testid="column"]:first-child button { background: #8b5cf6 !important; border-color: #8b5cf6 !important; color: #fff !important; }
+    div[data-testid="column"]:first-child button:hover { background: #7c3aed !important; }
+    div[data-testid="column"]:last-child button { background: #1d1f2b !important; border-color: rgba(255,255,255,.08) !important; color: #858699 !important; }
+    div[data-testid="column"]:last-child button:hover { border-color: rgba(255,255,255,.18) !important; color: #ecedf5 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div class='auth-card'>", unsafe_allow_html=True)
+    st.markdown("<h1>💱 CambioAR</h1><p class='sub'>Seguí tus vueltas y alertas de arbitraje</p>", unsafe_allow_html=True)
+
+    auth_tabs = st.tabs(["🔑 Iniciar sesión", "📝 Crear cuenta"])
+    with auth_tabs[0]:
+        with st.form("login_form"):
+            email = st.text_input("Email", placeholder="tu@email.com")
+            password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            if st.form_submit_button("🔑 Iniciar sesión", use_container_width=True, type="primary"):
+                if not email or not password:
+                    st.error("Completá email y contraseña")
+                else:
+                    try:
+                        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state.user = res.user
+                        st.session_state._access_token = res.session.access_token if res.session else None
+                        st.rerun()
+                    except Exception as e:
+                        st.error("Email o contraseña incorrectos")
+    with auth_tabs[1]:
+        with st.form("register_form"):
+            email = st.text_input("Email", placeholder="tu@email.com")
+            password = st.text_input("Contraseña", type="password", placeholder="mínimo 6 caracteres")
+            confirm = st.text_input("Confirmar contraseña", type="password", placeholder="repetí la contraseña")
+            if st.form_submit_button("📝 Crear cuenta", use_container_width=True, type="primary"):
+                if not email or not password:
+                    st.error("Completá email y contraseña")
+                elif len(password) < 6:
+                    st.error("La contraseña debe tener al menos 6 caracteres")
+                elif password != confirm:
+                    st.error("Las contraseñas no coinciden")
+                else:
+                    try:
+                        res = supabase.auth.sign_up({"email": email, "password": password})
+                        st.success("✅ Cuenta creada! Ahora iniciá sesión.")
+                    except Exception as e:
+                        msg = str(e)
+                        if "already" in msg.lower():
+                            st.error("Ya existe una cuenta con ese email")
+                        else:
+                            st.error(f"Error: {msg}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # ── After auth: load user data ──
