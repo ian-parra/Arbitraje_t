@@ -122,7 +122,7 @@ if st.sidebar.button("🔄 Refrescar datos", use_container_width=True, type="pri
 st.sidebar.caption("Limpia caché y vuelve a consultar APIs")
 
 ntfy_topic = st.sidebar.text_input("📲 Push ntfy.sh", placeholder="ej: cambioar-juan",
-    help="Instalá ntfy en tu celular/PC y suscribite a un tema. Poné el mismo tema acá para recibir notificaciones push.")
+    help="Instalá ntfy en tu celular/PC y suscribite a un tema. Poné el mismo tema acá para recibir notificaciones push.\n\n📱 Android: play.google.com/store/apps/details?id=io.heckel.ntfy\n🍎 iOS: apps.apple.com/app/ntfy/id1625396347\n💻 Web: ntfy.sh/app")
 
 # ── Last updated ──
 _ts = datetime.now()
@@ -526,7 +526,13 @@ with tabs[2]:
     if ntfy_topic:
         st.info(f"📲 Notificaciones push activas → ntfy.sh/{ntfy_topic}")
     else:
-        st.info("Las alertas verifican cotizaciones cada 60 segundos contra las APIs. Configurá un tema en la sidebar para recibir notificaciones push.")
+        st.info("""Las alertas verifican cotizaciones cada 60s. Para notificaciones aunque cierres la app:
+
+📱 **Android:** [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy)
+🍎 **iOS:** [App Store](https://apps.apple.com/app/ntfy/id1625396347)
+💻 **Web/PC:** [ntfy.sh/app](https://ntfy.sh/app)
+
+Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
 
     prices = {}
     if o_venta: prices['dolar_oficial'] = o_venta
