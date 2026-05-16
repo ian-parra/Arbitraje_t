@@ -374,11 +374,16 @@ with tabs[1]:
     st.markdown("### 📊 Mis Vueltas")
 
     # Form always visible at top
+    # Default inversión = resultado de la última vuelta (interés compuesto)
+    last_ars = 0.0
+    if st.session_state.vueltas:
+        _, _, last_ars, _, _ = calc_vuelta(st.session_state.vueltas[-1])
+
     with st.expander("➕ Nueva vuelta", expanded=True):
         with st.form("vuelta_form", clear_on_submit=True):
             c1,c2 = st.columns(2)
             with c1:
-                f_pesos = st.number_input("Inversión (ARS)", value=1_000_000.0, step=100_000.0, format="%.2f")
+                f_pesos = st.number_input("Inversión (ARS)", value=float(last_ars or 1_000_000), step=100_000.0, format="%.2f")
                 f_cotizacion = st.number_input("Cotización compra USD oficial", value=float(o_venta or 1400), step=1.0)
                 f_tasa = st.number_input("Tasa USD→USDC/USDT", value=0.9527, step=0.001, format="%.4f", help="Ej: Lemon cobra ~4.7%, tasa ~0.9527. Si no usás stablecoin, poné 1.0")
             with c2:
