@@ -7,6 +7,7 @@ import numpy as np
 import plotly.express as px
 from datetime import datetime
 import uuid
+import base64
 
 st.set_page_config(page_title="CambioAR · Cotizaciones", layout="wide", page_icon="💱")
 
@@ -64,6 +65,15 @@ def fmt_ars(v):
 
 def fmt_pct(v):
     return f"{'+' if v>=0 else ''}{v:.3f}%"
+
+def beep_sound():
+    b64 = base64.b64encode(bytes([
+        0x52,0x49,0x46,0x46,0x2e,0x00,0x00,0x00,0x57,0x41,0x56,0x45,0x66,0x6d,0x74,0x20,
+        0x10,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x44,0xac,0x00,0x00,0x88,0x58,0x01,0x00,
+        0x02,0x00,0x10,0x00,0x64,0x61,0x74,0x61,0x0a,0x00,0x00,0x00,0x00,0x00,0xff,0x7f,
+        0x00,0x00,0xff,0x7f,0x00,0x00
+    ])).decode()
+    return f'<audio autoplay><source src="data:audio/wav;base64,{b64}" type="audio/wav"></audio>'
 
 def calc_vuelta(v):
     usd = v['pesosInicial'] / v['cotizacionCompra']
@@ -547,12 +557,28 @@ with tabs[2]:
             save_json(ALERTS_FILE, st.session_state.alerts)
             st.rerun()
 
+    # Track previously triggered for notifications
+    if 'alert_fired' not in st.session_state:
+        st.session_state.alert_fired = set()
+
     if not st.session_state.alerts:
         st.caption("No hay alertas creadas.")
     else:
+        triggered_count = 0
+        new_triggers = 0
         for a in st.session_state.alerts:
             current = prices.get(a['type'],0)
             triggered = (a['condition']=="mayor a" and current>a['price']) or (a['condition']=="menor a" and current<a['price'] and current>0)
+            was_fired = a['id'] in st.session_state.alert_fired
+            if triggered:
+                triggered_count += 1
+                if not was_fired:
+                    new_triggers += 1
+                    st.toast(f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)})")
+                    st.session_state.alert_fired.add(a['id'])
+            else:
+                st.session_state.alert_fired.discard(a['id'])
+
             a['triggered'] = triggered
             save_json(ALERTS_FILE, st.session_state.alerts)
 
@@ -565,9 +591,19 @@ with tabs[2]:
             with c3:
                 if st.button("🗑", key=f"del_alert_{a['id']}"):
                     st.session_state.alerts = [x for x in st.session_state.alerts if x['id']!=a['id']]
+                    st.session_state.alert_fired.discard(a['id'])
                     save_json(ALERTS_FILE, st.session_state.alerts)
                     st.rerun()
             st.divider()
+
+        # Update page title with alert count + play sound on new triggers
+        if triggered_count:
+            title = f"🔔 {triggered_count} alertas · CambioAR"
+            if new_triggers:
+                st.markdown(beep_sound(), unsafe_allow_html=True)
+        else:
+            title = "CambioAR · Cotizaciones"
+        st.markdown(f"<script>document.title={json.dumps(title)}</script>", unsafe_allow_html=True)
 
 # ── Footer ──
 st.markdown("---")
