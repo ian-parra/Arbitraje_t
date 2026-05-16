@@ -155,13 +155,13 @@ usdc_usd_best = sorted([(s,d['ask']) for s,d in c_usdc_usd.items() if isinstance
 best_usdc_usd_rate = usdc_usd_best[0][1] if usdc_usd_best else 1.0
 best_usdc_usd_name = usdc_usd_best[0][0][0].upper()+usdc_usd_best[0][0][1:].replace('p2p',' P2P') if usdc_usd_best else 'Binance'
 
-tabs = st.tabs(["💎 Perlitas","📊 Mis Vueltas","🔔 Alertas"])
+tabs = st.tabs(["🛤️ Rutas","📊 Mis Vueltas","🔔 Alertas"])
 
 # Global default for sell price used across tabs
 default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
 
 # ════════════════════════════════════════
-# TAB 0: PERLITAS
+# TAB 0: RUTAS
 # ════════════════════════════════════════
 with tabs[0]:
 
