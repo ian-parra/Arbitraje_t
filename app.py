@@ -155,7 +155,7 @@ usdc_usd_best = sorted([(s,d['ask']) for s,d in c_usdc_usd.items() if isinstance
 best_usdc_usd_rate = usdc_usd_best[0][1] if usdc_usd_best else 1.0
 best_usdc_usd_name = usdc_usd_best[0][0][0].upper()+usdc_usd_best[0][0][1:].replace('p2p',' P2P') if usdc_usd_best else 'Binance'
 
-tabs = st.tabs(["💎 Perlitas","🏦 Bancos","USDT","USDC","📊 Mis Vueltas","🔔 Alertas"])
+tabs = st.tabs(["💎 Perlitas","📊 Mis Vueltas","🔔 Alertas"])
 
 # Global default for sell price used across tabs
 default_venta = best_usdc_sell['bid'] if best_usdc_sell else 1450.0
@@ -366,216 +366,10 @@ with tabs[0]:
     """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════
-# TAB 1: BANCOS
 # ════════════════════════════════════════
-def render_fiat(wallets_only):
-    merged = {}
-    now = datetime.now().timestamp()
-
-    if isinstance(cd_wallets, list):
-        for item in cd_wallets:
-            slug = item.get('slug','')
-            bid = item.get('bid',0) or 0
-            ask = item.get('ask',0) or 0
-            if slug=='brubank' and bid>100000:
-                bid/=1000; ask/=1000
-            is_wallet = slug in WALLET_SLUGS or not item.get('isBank',False)
-            merged[slug] = {
-                'slug':slug, 'name':item.get('prettyName') or item.get('name',''),
-                'bid':bid, 'ask':ask, 'type':'billetera' if is_wallet else 'banco',
-                'source':'comparadolar', 'time':0,
-                'is_247':item.get('is24x7',False), 'is_bank':item.get('isBank',False),
-                'ccl':slug in CCL_SLUGS
-            }
-
-    if isinstance(cy_bancos, dict):
-        for cy_slug, d in cy_bancos.items():
-            if not isinstance(d, dict): continue
-            cd_slug = CRYPTOYA_TO_CDOLAR.get(cy_slug)
-            slug = cd_slug or cy_slug
-            existing = merged.get(slug)
-            age = now - (d.get('time',0) or 0)
-            is_wallet = slug in WALLET_SLUGS
-            tp = 'billetera' if is_wallet else 'banco'
-            if existing and (existing['time']==0 or age<86400):
-                if existing['is_bank'] or tp=='banco':
-                    existing['bid'] = d.get('bid',0) or 0
-                    existing['ask'] = d.get('ask',0) or 0
-                    existing['source'] = 'criptoya'
-                    existing['time'] = d.get('time',0) or 0
-            elif not existing:
-                nm = BANK_NAMES.get(cy_slug, cy_slug[0].upper()+cy_slug[1:])
-                merged[slug] = {
-                    'slug':slug, 'name':nm,
-                    'bid':d.get('bid',0) or 0, 'ask':d.get('ask',0) or 0,
-                    'type':tp, 'source':'criptoya', 'time':d.get('time',0) or 0,
-                    'is_247':False, 'is_bank':tp=='banco', 'ccl':slug in CCL_SLUGS
-                }
-
-    items = [v for v in merged.values() if v.get('bid') or v.get('ask')]
-    if wallets_only:
-        items = [v for v in items if v['type']=='billetera']
-    items.sort(key=lambda x: x.get('bid',0), reverse=True)
-
-    bids = [x['bid'] for x in items if x['bid']]
-    asks = [x['ask'] for x in items if x['ask'] and x['ask']>0]
-    spreads = [x['ask']-x['bid'] for x in items if x['ask'] and x['bid']]
-
-    k1,k2,k3,k4 = st.columns(4)
-    with k1: st.metric("Mejor compra", fmt(min(asks)) if asks else '—')
-    with k2: st.metric("Mejor venta", fmt(max(bids)) if bids else '—')
-    with k3: st.metric("Spread promedio", f"${sum(spreads)/len(spreads):.2f}" if spreads else '—')
-    with k4: st.metric("Entidades", str(len(items)))
-
-    col1, col2 = st.columns(2)
-    prefix = "wal" if wallets_only else "bank"
-    with col1:
-        q = st.text_input("🔍 Buscar", placeholder="Nombre...", label_visibility="collapsed", key=f"{prefix}_search")
-    with col2:
-        solo_247 = st.checkbox("24/7", value=False, key=f"{prefix}_247")
-
-    if q:
-        ql = q.lower()
-        items = [x for x in items if ql in x['name'].lower() or ql in x['slug'].lower()]
-    if solo_247:
-        items = [x for x in items if x['is_247']]
-
-    max_bid = max(x['bid'] for x in items if x['bid']) if any(x['bid'] for x in items) else 0
-    for item in items:
-        bid = item['bid']; ask = item['ask']
-        is_best = bid == max_bid and bid > 0
-        pct = (bid / max_bid * 100) if max_bid > 0 else 0
-        st.markdown(f"""
-<div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-<div style="flex:2">
-<div style="font-size:13px;font-weight:600;color:#ecedf5">{item['name']}{' <span style="font-size:9px;color:#5da8ff;font-weight:400">🔵 CCL</span>' if item['ccl'] else ''}{' <span style="font-size:9px;color:#29e8a0">⭐ Mejor</span>' if is_best else ''}</div>
-<div style="font-size:10px;color:#484a5c;margin-top:1px">{item['source']}{' · 24/7' if item['is_247'] else ''}</div>
-</div>
-<div style="flex:1;text-align:right">
-<div style="font-size:10px;color:#484a5c">Compra</div>
-<div style="font-size:13px;font-weight:600;color:#f5b946">{fmt(ask) if ask else '—'}</div>
-</div>
-<div style="flex:1;text-align:right">
-<div style="font-size:10px;color:#484a5c">Venta</div>
-<div style="font-size:13px;font-weight:600">{fmt(bid) if bid else '—'}</div>
-</div>
-<div style="flex:0.8;text-align:right">
-<div style="font-size:10px;color:#484a5c">Spread</div>
-<div style="font-size:12px;font-weight:600;color:{'#29e8a0' if bid and ask and ask-bid<50 else '#f2566b' if bid and ask else '#484a5c'}">${ask-bid:.0f}</div>
-</div>
-</div>
-""", unsafe_allow_html=True)
-
-def render_crypto(asset, data):
-    coin = asset.upper()
-    items = [{'slug':s,'name':s[0].upper()+s[1:].replace('p2p',' P2P').replace('exchange',''),
-        'ask':d.get('ask',0) or 0,'bid':d.get('bid',0) or 0,'totalAsk':d.get('totalAsk',0) or 0,'totalBid':d.get('totalBid',0) or 0,'time':d.get('time',0) or 0}
-        for s,d in data.items() if isinstance(d,dict) and s not in ('wexx','weeexp2p')]
-    items = [x for x in items if x['ask'] or x['bid']]
-    items.sort(key=lambda x: x['bid'], reverse=True)
-
-    asks = [x['ask'] for x in items if x['ask']]
-    bids = [x['bid'] for x in items if x['bid']]
-    min_ask = min(asks) if asks else 0
-    max_bid = max(bids) if bids else 0
-
-    k1,k2,k3,k4 = st.columns(4)
-    with k1: st.metric(f"Mejor compra {coin}", fmt(min_ask) if min_ask else '—')
-    with k2: st.metric(f"Mejor venta {coin}", fmt(max_bid) if max_bid else '—')
-    avg_spread = sum(x['ask']-x['bid'] for x in items if x['ask'] and x['bid'])/max(len([x for x in items if x['ask'] and x['bid']]),1)
-    with k3: st.metric("Spread promedio", f"${avg_spread:.2f}")
-    with k4: st.metric("Exchanges", str(len(items)))
-
-    for item in items:
-        has_ask = item['ask']>0; has_bid = item['bid']>0
-        best_buy = has_ask and item['ask']==min_ask
-        best_sell = has_bid and item['bid']==max_bid
-        spread = (item['ask']-item['bid']) if has_ask and has_bid else 0
-        age = datetime.fromtimestamp(item['time']) if item['time'] else None
-        badges = []
-        if best_buy: badges.append('<span style="font-size:9px;color:#f5b946">🟢 Mejor compra</span>')
-        if best_sell: badges.append('<span style="font-size:9px;color:#29e8a0">💚 Mejor venta</span>')
-        badge_str = (' ').join(badges)
-
-        st.markdown(f"""
-<div style="background:#0f1016;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-<span style="font-size:13px;font-weight:600;color:#ecedf5">{item['name']}</span>
-<span style="font-size:10px;color:#484a5c">{age.strftime("%H:%M") if age else ''}</span>
-</div>
-<div style="display:flex;justify-content:space-between;align-items:center">
-<div><div style="font-size:9px;color:#484a5c">Compra</div><div style="font-size:14px;font-weight:600;color:{'#f5b946' if best_buy else '#ecedf5'}">{fmt(item['ask']) if has_ask else '—'}</div></div>
-<div><div style="font-size:9px;color:#484a5c">Venta</div><div style="font-size:14px;font-weight:600;color:{'#29e8a0' if best_sell else '#ecedf5'}">{fmt(item['bid']) if has_bid else '—'}</div></div>
-<div><div style="font-size:9px;color:#484a5c">Spread</div><div style="font-size:12px;font-weight:600;color:{'#29e8a0' if spread<50 else '#f2566b' if spread>100 else '#f5b946'}">${spread:.0f}</div></div>
-<div style="text-align:right">{badge_str}</div>
-</div>
-</div>
-""", unsafe_allow_html=True)
-
+# TAB 1: MIS VUELTAS
+# ════════════════════════════════════════
 with tabs[1]:
-    st.markdown("### 🏦 Bancos")
-    render_fiat(wallets_only=False)
-
-# ════════════════════════════════════════
-# TAB 2-3: USDT / USDC
-# ════════════════════════════════════════
-def render_crypto(asset, data):
-    coin = asset.upper()
-    items = [{'slug':s,'name':s[0].upper()+s[1:].replace('p2p',' P2P').replace('exchange',''),
-        'ask':d.get('ask',0) or 0,'bid':d.get('bid',0) or 0,'totalAsk':d.get('totalAsk',0) or 0,'totalBid':d.get('totalBid',0) or 0,'time':d.get('time',0) or 0}
-        for s,d in data.items() if isinstance(d,dict) and s not in ('wexx','weeexp2p')]
-    items = [x for x in items if x['ask'] or x['bid']]
-    items.sort(key=lambda x: x['bid'], reverse=True)
-
-    asks = [x['ask'] for x in items if x['ask']]
-    bids = [x['bid'] for x in items if x['bid']]
-    min_ask = min(asks) if asks else 0
-    max_bid = max(bids) if bids else 0
-    max_ask = max(asks) if asks else 0
-    min_bid = min(bids) if bids else 0
-
-    k1,k2,k3,k4 = st.columns(4)
-    with k1: st.metric(f"Mejor compra {coin}", fmt(min_ask) if min_ask else '—', help="Menor precio de compra")
-    with k2: st.metric(f"Mejor venta {coin}", fmt(max_bid) if max_bid else '—', help="Mayor precio de venta")
-    avg_spread = sum(x['ask']-x['bid'] for x in items if x['ask'] and x['bid'])/max(len([x for x in items if x['ask'] and x['bid']]),1)
-    with k3: st.metric("Spread promedio", f"${avg_spread:.2f}")
-    with k4: st.metric("Exchanges", str(len(items)))
-
-    for item in items:
-        has_ask = item['ask']>0
-        has_bid = item['bid']>0
-        best_buy = has_ask and item['ask']==min_ask
-        best_sell = has_bid and item['bid']==max_bid
-        spread = (item['ask']-item['bid']) if has_ask and has_bid else 0
-
-        c1,c2,c3 = st.columns([2,1,1])
-        with c1:
-            nm = item['name']
-            if best_buy: nm += " 🟢"
-            if best_sell: nm += " 💚"
-            st.markdown(f"**{nm}**")
-            if item['time']:
-                ts = datetime.fromtimestamp(item['time'])
-                st.caption(ts.strftime("%H:%M"))
-        with c2:
-            if has_ask: st.markdown(f"Compra: {fmt(item['ask'])}")
-        with c3:
-            if has_bid: st.markdown(f"Venta: {fmt(item['bid'])}")
-        if spread>0:
-            st.caption(f"Spread: ${spread:.2f}")
-        st.divider()
-
-with tabs[2]:
-    st.markdown("### USDT")
-    render_crypto('USDT', c_usdt_ars)
-with tabs[3]:
-    st.markdown("### USDC")
-    render_crypto('USDC', c_usdc_ars)
-
-# ════════════════════════════════════════
-# TAB 4: MIS VUELTAS
-# ════════════════════════════════════════
-with tabs[4]:
     st.markdown("### 📊 Mis Vueltas")
 
     # Form always visible at top
@@ -769,9 +563,9 @@ with tabs[4]:
             st.rerun()
 
 # ════════════════════════════════════════
-# TAB 5: ALERTAS
+# TAB 2: ALERTAS
 # ════════════════════════════════════════
-with tabs[5]:
+with tabs[2]:
     st.markdown("### 🔔 Alertas de precio")
     st.info("Las alertas verifican cotizaciones cada 60 segundos contra las APIs.")
 
