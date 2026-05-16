@@ -192,7 +192,7 @@ st.sidebar.markdown(f"### ⚙️ Configuración  🕐 {_ts.strftime('%H:%M:%S')}
 st.sidebar.caption(f"👤 {user_email}")
 if st.sidebar.button("🚪 Cerrar sesión"):
     supabase.auth.sign_out()
-    for k in ['user','vueltas','alerts','_user_id','alert_fired','ntfy_topic']:
+    for k in ['user','vueltas','alerts','_user_id','alert_fired','ntfy_topic','_access_token']:
         st.session_state.pop(k, None)
     st.rerun()
 
