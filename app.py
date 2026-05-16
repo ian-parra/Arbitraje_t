@@ -1,39 +1,61 @@
 import streamlit as st
 import requests
 import json
-import os
 import pandas as pd
 import numpy as np
 import plotly.express as px
 from datetime import datetime
-import uuid
 import base64
 import time as _time
+from supabase import create_client, Client
 
 st.set_page_config(page_title="CambioAR · Cotizaciones", layout="wide", page_icon="💱")
+
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["anon_key"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 DOLARAPI = "https://dolarapi.com/v1"
 CDOLAR = "https://api.comparadolar.ar/api/v1"
 CRIPTOYA = "https://criptoya.com/api"
-DATA_DIR = "data"
-VUELTAS_FILE = os.path.join(DATA_DIR, "vueltas.json")
-ALERTS_FILE = os.path.join(DATA_DIR, "alerts.json")
 WALLET_SLUGS = {'plus','plus-crypto','plus-inversiones','reba','tiendadolar','wallbit','nexo','lemon','belo','prex'}
 CRYPTOYA_TO_CDOLAR = {'bbva':'bbva','bna':'banco-nacion','brubank':'brubank','hipotecario':'banco-hipotecario','supervielle':'banco-supervielle','pluscambio':'plus','prex':'prex'}
 BANK_NAMES = {'andina':'Banco Andina','bapro':'Banco BAPRO','ciudad':'Banco Ciudad','columbia':'Banco Columbia','comafi':'Banco Comafi','galicia':'Banco Galicia','icbc':'ICBC','macro':'Banco Macro','mariva':'Banco Mariva','patagonia':'Banco Patagonia','piano':'Banco Piano','plazacambio':'Plaza Cambio','santander':'Banco Santander','triacambio':'Triacambio','bytelime':'Tienda Dólar','bna':'Banco Nación','hipotecario':'Banco Hipotecario','supervielle':'Banco Supervielle','bbva':'BBVA','brubank':'Brubank','pluscambio':'Plus Cambio','prex':'PREX'}
 CCL_SLUGS = ['plus-crypto','plus-inversiones','cocos','nexo','wallbit']
 
-def load_json(path, default=None):
-    if default is None: default = []
+def supabase_load(table):
+    if not st.session_state.get('user'): return []
     try:
-        if os.path.exists(path):
-            with open(path) as f: return json.load(f)
-    except: pass
-    return default
+        res = supabase.table(table).select("*").eq("user_id", st.session_state.user.id).order("created_at").execute()
+        return res.data
+    except Exception as e:
+        st.error(f"Error al cargar {table}: {e}")
+        return []
 
-def save_json(path, data):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(path, 'w') as f: json.dump(data, f, indent=2)
+def supabase_save(table, data):
+    if not st.session_state.get('user'): return None
+    data.pop('id', None)
+    data['user_id'] = st.session_state.user.id
+    try:
+        res = supabase.table(table).insert(data).execute()
+        return res.data[0] if res.data else data
+    except Exception as e:
+        st.error(f"Error al guardar: {e}")
+        return None
+
+def supabase_delete(table, record_id):
+    if not st.session_state.get('user'): return
+    try:
+        supabase.table(table).delete().eq("id", record_id).eq("user_id", st.session_state.user.id).execute()
+    except Exception as e:
+        st.error(f"Error al eliminar: {e}")
+
+def supabase_update(table, record_id, data):
+    if not st.session_state.get('user'): return
+    try:
+        supabase.table(table).update(data).eq("id", record_id).eq("user_id", st.session_state.user.id).execute()
+    except Exception as e:
+        st.error(f"Error al actualizar: {e}")
 
 @st.cache_data(ttl=120)
 def get(url):
@@ -84,11 +106,41 @@ def calc_vuelta(v):
     pct = gan / v['pesosInicial'] * 100
     return usd, usdc, ars, gan, pct
 
-# ── Init ──
-if 'vueltas' not in st.session_state:
-    st.session_state.vueltas = load_json(VUELTAS_FILE)
-if 'alerts' not in st.session_state:
-    st.session_state.alerts = load_json(ALERTS_FILE)
+# ── Auth gate ──
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+if not st.session_state.user:
+    st.markdown("### 🔐 CambioAR")
+    with st.form("auth_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Contraseña", type="password")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.form_submit_button("🔑 Iniciar sesión", use_container_width=True):
+                try:
+                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    st.session_state.user = res.user
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        with c2:
+            if st.form_submit_button("📝 Registrarse", use_container_width=True):
+                try:
+                    res = supabase.auth.sign_up({"email": email, "password": password})
+                    if res.user:
+                        st.success("Registrado! Revisá tu email para confirmar.")
+                    else:
+                        st.success("Revisá tu email para confirmar el registro.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    st.stop()
+
+# ── Load user data from Supabase ──
+if 'vueltas' not in st.session_state or st.session_state.get('_user_id') != st.session_state.user.id:
+    st.session_state.vueltas = supabase_load("vueltas")
+    st.session_state.alerts = supabase_load("alerts")
+    st.session_state._user_id = st.session_state.user.id
 
 # ── Title ──
 st.markdown("""
@@ -117,8 +169,14 @@ st.title("CambioAR", anchor=False)
 
 # ── Sidebar config ──
 _ts = datetime.now()
+user_email = st.session_state.user.email if st.session_state.user else ""
 st.sidebar.markdown(f"### ⚙️ Configuración  🕐 {_ts.strftime('%H:%M:%S')}")
-st.sidebar.caption("Actualización automática cada 2-5 min según caché de APIs")
+st.sidebar.caption(f"👤 {user_email}")
+if st.sidebar.button("🚪 Cerrar sesión"):
+    supabase.auth.sign_out()
+    for k in ['user','vueltas','alerts','_user_id','alert_fired']:
+        st.session_state.pop(k, None)
+    st.rerun()
 
 # Feedback after refresh
 if st.session_state.pop('_refresh_ok', False):
@@ -454,7 +512,6 @@ with tabs[1]:
 
             if st.form_submit_button("💾 Guardar vuelta"):
                 v = {
-                    'id': str(uuid.uuid4())[:8],
                     'fecha': f_fecha.strftime("%Y-%m-%d"),
                     'pesosInicial': f_pesos,
                     'cotizacionCompra': f_cotizacion,
@@ -464,8 +521,9 @@ with tabs[1]:
                     'exchange': f_exchange,
                     'notas': f_notas
                 }
-                st.session_state.vueltas.append(v)
-                save_json(VUELTAS_FILE, st.session_state.vueltas)
+                saved = supabase_save("vueltas", v)
+                if saved:
+                    st.session_state.vueltas.append(saved)
                 st.rerun()
 
     vueltas = st.session_state.vueltas
@@ -548,8 +606,8 @@ with tabs[1]:
             format_func=lambda x: x[1])
         if st.button("🗑 Eliminar", use_container_width=True):
             idx = del_id[0]
-            st.session_state.vueltas.pop(idx)
-            save_json(VUELTAS_FILE, st.session_state.vueltas)
+            v_del = st.session_state.vueltas.pop(idx)
+            supabase_delete("vueltas", v_del['id'])
             st.rerun()
 
         st.divider()
@@ -561,7 +619,7 @@ with tabs[1]:
         new_notes = st.text_area("Editar notas", value=current_notes, key="note_edit")
         if st.button("💾 Guardar notas", use_container_width=True):
             vueltas[note_idx[0]]['notas'] = new_notes
-            save_json(VUELTAS_FILE, vueltas)
+            supabase_update("vueltas", vueltas[note_idx[0]]['id'], {'notas': new_notes})
             st.rerun()
 
 # ════════════════════════════════════════
@@ -634,8 +692,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
         if st.form_submit_button("➕ Crear alerta"):
             current = all_prices.get(alert_type, 0)
             triggered = (condition=="mayor a" and current>alert_price) or (condition=="menor a" and current<alert_price and current>0)
-            st.session_state.alerts.append({
-                'id':str(uuid.uuid4())[:8],
+            alert = {
                 'type':alert_type,
                 'name':alert_name,
                 'condition':condition,
@@ -643,8 +700,10 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 'is_route':is_route,
                 'triggered':triggered,
                 'created':datetime.now().isoformat()
-            })
-            save_json(ALERTS_FILE, st.session_state.alerts)
+            }
+            saved = supabase_save("alerts", alert)
+            if saved:
+                st.session_state.alerts.append(saved)
             st.rerun()
 
     # Track previously triggered for notifications
@@ -695,7 +754,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 st.session_state.alert_fired.discard(a['id'])
 
             a['triggered'] = triggered
-            save_json(ALERTS_FILE, st.session_state.alerts)
+            supabase_update("alerts", a['id'], {'triggered': triggered})
 
             c1,c2,c3 = st.columns([2,2,1])
             with c1:
@@ -710,7 +769,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 if st.button("🗑", key=f"del_alert_{a['id']}"):
                     st.session_state.alerts = [x for x in st.session_state.alerts if x['id']!=a['id']]
                     st.session_state.alert_fired.discard(a['id'])
-                    save_json(ALERTS_FILE, st.session_state.alerts)
+                    supabase_delete("alerts", a['id'])
                     st.rerun()
             st.divider()
 
