@@ -121,6 +121,9 @@ if st.sidebar.button("🔄 Refrescar datos", use_container_width=True, type="pri
     st.rerun()
 st.sidebar.caption("Limpia caché y vuelve a consultar APIs")
 
+ntfy_topic = st.sidebar.text_input("📲 Push ntfy.sh", placeholder="ej: cambioar-juan",
+    help="Instalá ntfy en tu celular/PC y suscribite a un tema. Poné el mismo tema acá para recibir notificaciones push.")
+
 # ── Last updated ──
 _ts = datetime.now()
 st.sidebar.markdown("---")
@@ -520,7 +523,10 @@ with tabs[1]:
 # ════════════════════════════════════════
 with tabs[2]:
     st.markdown("### 🔔 Alertas de precio")
-    st.info("Las alertas verifican cotizaciones cada 60 segundos contra las APIs.")
+    if ntfy_topic:
+        st.info(f"📲 Notificaciones push activas → ntfy.sh/{ntfy_topic}")
+    else:
+        st.info("Las alertas verifican cotizaciones cada 60 segundos contra las APIs. Configurá un tema en la sidebar para recibir notificaciones push.")
 
     prices = {}
     if o_venta: prices['dolar_oficial'] = o_venta
@@ -575,6 +581,12 @@ with tabs[2]:
                 if not was_fired:
                     new_triggers += 1
                     st.toast(f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)})")
+                    if ntfy_topic:
+                        try:
+                            msg = f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)})"
+                            requests.post(f"https://ntfy.sh/{ntfy_topic}", data=msg.encode(), timeout=5)
+                        except:
+                            pass
                     st.session_state.alert_fired.add(a['id'])
             else:
                 st.session_state.alert_fired.discard(a['id'])
