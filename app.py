@@ -568,20 +568,23 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
         'dolar_ccl':'🌎 CCL','usdt_ars':'USDT/ARS','usdc_ars':'USDC/ARS'
     }
 
-    # Add new alert
+    # Alert type selector (outside form for immediate reactivity)
+    alert_type = st.selectbox("Tipo", list(all_prices.keys()) if all_prices else ['dolar_oficial'],
+        key="alert_type_main")
+    is_route = alert_type.startswith('ruta_')
+    alert_name = route_labels.get(alert_type, price_labels.get(alert_type, alert_type))
+
     with st.form("alert_form"):
         c1,c2 = st.columns(2)
         with c1:
-            alert_type = st.selectbox("Tipo", list(all_prices.keys()) if all_prices else ['dolar_oficial'])
-            is_route = alert_type.startswith('ruta_')
-            alert_name = route_labels.get(alert_type, price_labels.get(alert_type, alert_type))
+            st.markdown(f"**{alert_name}**")
         with c2:
             condition_opts = ["mayor a"] if is_route else ["mayor a","menor a"]
-            condition = st.selectbox("Condición", condition_opts, key=f"alert_cond_{alert_type}")
+            condition = st.selectbox("Condición", condition_opts)
             default_val = float(route_pcts.get(alert_type, prices.get(alert_type, 1500)))
             step = 0.1 if is_route else 100.0
-            label = "% mínimo" if is_route else "Precio"
-            alert_price = st.number_input(label, value=default_val, step=step, format="%.2f", key=f"alert_val_{alert_type}")
+            alert_price = st.number_input("% de ganancia" if is_route else "Precio (ARS)",
+                value=default_val, step=step, format="%.2f")
         if st.form_submit_button("➕ Crear alerta"):
             current = all_prices.get(alert_type, 0)
             triggered = (condition=="mayor a" and current>alert_price) or (condition=="menor a" and current<alert_price and current>0)
