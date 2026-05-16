@@ -8,6 +8,7 @@ import plotly.express as px
 from datetime import datetime
 import uuid
 import base64
+import time as _time
 
 st.set_page_config(page_title="CambioAR · Cotizaciones", layout="wide", page_icon="💱")
 
@@ -115,19 +116,51 @@ hr { margin: 0 !important; border-color: rgba(255,255,255,.06) !important; }
 st.title("CambioAR", anchor=False)
 
 # ── Sidebar config ──
-st.sidebar.markdown("### ⚙️ Configuración")
-if st.sidebar.button("🔄 Refrescar datos", use_container_width=True, type="primary"):
-    st.cache_data.clear()
-    st.rerun()
-st.sidebar.caption("Limpia caché y vuelve a consultar APIs")
-
-ntfy_topic = st.sidebar.text_input("📲 Push ntfy.sh", placeholder="ej: cambioar-juan",
-    help="Instalá ntfy en tu celular/PC y suscribite a un tema. Poné el mismo tema acá para recibir notificaciones push.\n\n📱 Android: play.google.com/store/apps/details?id=io.heckel.ntfy\n🍎 iOS: apps.apple.com/app/ntfy/id1625396347\n💻 Web: ntfy.sh/app")
-
-# ── Last updated ──
 _ts = datetime.now()
+st.sidebar.markdown(f"### ⚙️ Configuración  🕐 {_ts.strftime('%H:%M:%S')}")
+st.sidebar.caption("Actualización automática cada 2-5 min según caché de APIs")
+
+# Feedback after refresh
+if st.session_state.pop('_refresh_ok', False):
+    st.toast("✅ Datos actualizados", icon="🔄")
+
+col1, col2 = st.sidebar.columns([1, 3])
+with col1:
+    if st.button("🔄", help="Refrescar datos ahora"):
+        st.cache_data.clear()
+        st.session_state._refresh_ok = True
+        st.rerun()
+with col2:
+    refresh_intv = st.select_slider("", options=["Manual", "1 min", "5 min", "15 min"],
+        value="Manual", label_visibility="collapsed")
+    st.caption(f"Auto: {refresh_intv}")
+
+if refresh_intv != "Manual":
+    secs = int(refresh_intv.split()[0]) * 60
+    st.markdown(f'<meta http-equiv="refresh" content="{secs}">', unsafe_allow_html=True)
+
 st.sidebar.markdown("---")
-st.sidebar.caption(f"🕐 Actualizado: {_ts.strftime('%H:%M:%S')}")
+
+# ntfy push with validation
+ntfy_topic = st.sidebar.text_input("📲 Push a celular (ntfy.sh)", placeholder="ej: cambioar-juan",
+    help="Recibí notificaciones push gratis en tu celular instalando la app ntfy (Android/iOS). Suscribite a un tema y ponelo acá.")
+
+if ntfy_topic:
+    ntfy_topic = ntfy_topic.strip()
+    if ' ' in ntfy_topic or not ntfy_topic:
+        st.sidebar.warning("El tema no debe contener espacios", icon="⚠️")
+        ntfy_topic = ""
+    else:
+        st.sidebar.success("🔔 Push activado", icon="📲")
+
+with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
+    st.markdown("""1. Instalá la app: [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) | [iOS](https://apps.apple.com/app/ntfy/id1625396347)
+2. Abrila y suscribite a un tema (ej: `cambioar-juan`)
+3. Poné el mismo tema acá arriba
+4. ¡Listo! Las alertas te llegan aunque cierres la app""")
+
+st.sidebar.markdown("---")
+st.sidebar.caption("v1.0 · CambioAR")
 
 # ════════════════════════════════════════
 # FETCH ALL DATA
@@ -679,4 +712,4 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
 
 # ── Footer ──
 st.markdown("---")
-st.caption("CambioAR · Datos de DolarApi, ComparaDolar y CriptoYa · Actualización cada 2-5 min")
+st.caption("CambioAR v1.0 · Datos de DolarApi, ComparaDolar y CriptoYa")
