@@ -259,6 +259,25 @@ if st.sidebar.button("🔄", help="Refrescar datos ahora"):
 st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
+st.sidebar.markdown(
+    '<a href="https://cafecito.app/todosumarbitraje" target="_blank" class="cafe-btn">☕ Invitame un cafecito</a>',
+    unsafe_allow_html=True)
+st.sidebar.markdown("""
+<style>
+a.cafe-btn {
+  display: block; text-align: center; padding: 14px 10px;
+  border: 2px solid #8b5cf6; border-radius: 12px;
+  color: #8b5cf6; font-weight: 700; font-size: 15px;
+  text-decoration: none; transition: 0.2s;
+}
+a.cafe-btn:hover { background: #8b5cf6; color: #fff; }
+@media (max-width: 640px) {
+  a.cafe-btn { font-size: 17px; padding: 16px 12px; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
 
 # ntfy push with validation (persisted in user_settings)
 ntfy_topic = st.sidebar.text_input("📲 Push a celular (ntfy.sh)", placeholder="ej: cambioar-juan",
@@ -282,25 +301,7 @@ st.sidebar.markdown(
     '<a href="https://ntfy.sh" target="_blank" style="font-size:11px;color:#858699;text-decoration:none">💡 ntfy.sh — notificaciones push gratis</a>',
     unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    '<a href="https://cafecito.app/todosumarbitraje" target="_blank" class="cafe-btn">☕ Invitame un cafecito</a>',
-    unsafe_allow_html=True)
-st.sidebar.markdown("""
-<style>
-a.cafe-btn {
-  display: block; text-align: center; padding: 14px 10px;
-  border: 2px solid #8b5cf6; border-radius: 12px;
-  color: #8b5cf6; font-weight: 700; font-size: 15px;
-  text-decoration: none; transition: 0.2s;
-}
-a.cafe-btn:hover { background: #8b5cf6; color: #fff; }
-@media (max-width: 640px) {
-  a.cafe-btn { font-size: 17px; padding: 16px 12px; }
-}
-</style>
-""", unsafe_allow_html=True)
-st.sidebar.caption("v1.0 · CambioAR")
+st.sidebar.caption("v1.5 · CambioAR")
 
 # ════════════════════════════════════════
 # FETCH ALL DATA
