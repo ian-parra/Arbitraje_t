@@ -220,6 +220,16 @@ hr { margin: 0 !important; border-color: rgba(255,255,255,.06) !important; }
 .gain { color: #29e8a0; }
 .loss { color: #f2566b; }
 .error-badge { display: inline-block; background: rgba(242,86,107,.12); border: 1px solid rgba(242,86,107,.3); border-radius: 4px; padding: 1px 6px; font-size: 9px; color: #f2566b; font-family: 'JetBrains Mono', monospace; }
+@media (max-width: 640px) {
+  .stTabs [data-baseweb="tab"] { font-size: 11px; padding: 5px 8px; }
+  div[data-testid="stMetric"] { padding: 8px; }
+  div[data-testid="stMetric"] div { font-size: 14px !important; }
+  .stDataFrame { font-size: 10px !important; }
+  .stButton button { font-size: 11px; padding: 4px 10px; }
+  .stNumberInput input { font-size: 13px; }
+  .st-emotion-cache-1gulkj5 { padding: 0 8px; }
+}
+</style>
 </style>
 """, unsafe_allow_html=True)
 
@@ -253,7 +263,7 @@ st.sidebar.markdown("---")
 # ntfy push with validation (persisted in user_settings)
 ntfy_topic = st.sidebar.text_input("📲 Push a celular (ntfy.sh)", placeholder="ej: cambioar-juan",
     value=st.session_state.get('ntfy_topic', ''),
-    help="Recibí notificaciones push gratis en tu celular instalando la app ntfy (Android/iOS). Suscribite a un tema y ponelo acá.")
+    help="Recibí notificaciones push gratis en tu celular instalando la app ntfy. Suscribite a un tema y ponelo acá.")
 
 if ntfy_topic:
     ntfy_topic = ntfy_topic.strip()
@@ -268,30 +278,25 @@ if ntfy_topic:
                 data={"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic},
                 params={"on_conflict": "user_id"})
 
-with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
-    st.markdown("""1. Instalá la app: [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) | [iOS](https://apps.apple.com/app/ntfy/id1625396347)
-2. Abrila y suscribite a un tema (ej: `cambioar-juan`)
-3. Poné el mismo tema acá arriba
-4. ¡Listo! Las alertas te llegan aunque cierres la app""")
+st.sidebar.markdown(
+    '<a href="https://ntfy.sh" target="_blank" style="font-size:11px;color:#858699;text-decoration:none">💡 ntfy.sh — notificaciones push gratis</a>',
+    unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("[☕ Invitame un cafecito](https://cafecito.app/todosumarbitraje)", unsafe_allow_html=True)
+st.sidebar.markdown(
+    '<a href="https://cafecito.app/todosumarbitraje" target="_blank" class="cafe-btn">☕ Invitame un cafecito</a>',
+    unsafe_allow_html=True)
 st.sidebar.markdown("""
 <style>
-a[href*="cafecito"] {
-  display: block;
-  text-align: center;
-  padding: 10px 16px;
-  border: 2px solid #8b5cf6;
-  border-radius: 12px;
-  color: #8b5cf6;
-  font-weight: 600;
-  text-decoration: none;
-  transition: 0.2s;
+a.cafe-btn {
+  display: block; text-align: center; padding: 14px 10px;
+  border: 2px solid #8b5cf6; border-radius: 12px;
+  color: #8b5cf6; font-weight: 700; font-size: 15px;
+  text-decoration: none; transition: 0.2s;
 }
-a[href*="cafecito"]:hover {
-  background: #8b5cf6;
-  color: #fff;
+a.cafe-btn:hover { background: #8b5cf6; color: #fff; }
+@media (max-width: 640px) {
+  a.cafe-btn { font-size: 17px; padding: 16px 12px; }
 }
 </style>
 """, unsafe_allow_html=True)
