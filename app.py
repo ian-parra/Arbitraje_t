@@ -621,9 +621,19 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                     new_triggers += 1
                     extra = ""
                     if a['type'] == 'usdt_ars' and best_usdt_sell:
-                        extra = f" | Mejor USDT: {best_usdt_sell['name']} ${best_usdt_sell['bid']:,.2f}"
+                        extra = f" | Mejor: {best_usdt_sell['name']} ${best_usdt_sell['bid']:,.2f}"
                     elif a['type'] == 'usdc_ars' and best_usdc_sell:
-                        extra = f" | Mejor USDC: {best_usdc_sell['name']} ${best_usdc_sell['bid']:,.2f}"
+                        extra = f" | Mejor: {best_usdc_sell['name']} ${best_usdc_sell['bid']:,.2f}"
+                    elif a['type'] == 'ruta_ofi_usdt' and best_usdt_buy and best_usdt_sell:
+                        extra = f" | Comprar USDT en {best_usdt_buy['name']} → Vender en {best_usdt_sell['name']}"
+                    elif a['type'] == 'ruta_ofi_usdc' and best_usdc_sell:
+                        extra = f" | Comprar USDC en {best_usdc_usd_name} → Vender en {best_usdc_sell['name']}"
+                    elif a['type'] == 'ruta_ofi_mep':
+                        extra = f" | MEP: ${mep_compra:,.0f}"
+                    elif a['type'] == 'ruta_ofi_blue':
+                        extra = f" | Blue: ${blue_compra:,.0f}"
+                    elif a['type'] == 'ruta_mep_blue':
+                        extra = f" | MEP ${mep_compra:,.0f} → Blue ${blue_compra:,.0f}"
                     if is_route:
                         msg = f"🔔 {a['name']}: {current:.2f}% (umbral: {a['price']:.2f}%){extra}"
                     else:
