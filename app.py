@@ -23,39 +23,43 @@ CRYPTOYA_TO_CDOLAR = {'bbva':'bbva','bna':'banco-nacion','brubank':'brubank','hi
 BANK_NAMES = {'andina':'Banco Andina','bapro':'Banco BAPRO','ciudad':'Banco Ciudad','columbia':'Banco Columbia','comafi':'Banco Comafi','galicia':'Banco Galicia','icbc':'ICBC','macro':'Banco Macro','mariva':'Banco Mariva','patagonia':'Banco Patagonia','piano':'Banco Piano','plazacambio':'Plaza Cambio','santander':'Banco Santander','triacambio':'Triacambio','bytelime':'Tienda Dólar','bna':'Banco Nación','hipotecario':'Banco Hipotecario','supervielle':'Banco Supervielle','bbva':'BBVA','brubank':'Brubank','pluscambio':'Plus Cambio','prex':'PREX'}
 CCL_SLUGS = ['plus-crypto','plus-inversiones','cocos','nexo','wallbit']
 
+def _auth_headers():
+    token = st.session_state.get('_access_token') or SUPABASE_KEY
+    return {"Authorization": f"Bearer {token}", "apikey": SUPABASE_KEY}
+
+def _supabase_req(method, table, data=None, params=None):
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    h = _auth_headers()
+    h["Content-Type"] = "application/json"
+    h["Prefer"] = "return=representation"
+    try:
+        r = requests.request(method, url, json=data, params=params, headers=h, timeout=10)
+        if r.status_code >= 400:
+            st.error(f"Error en {table}: {r.json()}")
+            return None
+        return r.json()
+    except Exception as e:
+        st.error(f"Error en {table}: {e}")
+        return None
+
 def supabase_load(table):
     if not st.session_state.get('user'): return []
-    try:
-        res = supabase.table(table).select("*").eq("user_id", st.session_state.user.id).order("created_at").execute()
-        return res.data
-    except Exception as e:
-        st.error(f"Error al cargar {table}: {e}")
-        return []
+    return _supabase_req("GET", table, params={"user_id": f"eq.{st.session_state.user.id}", "order": "created_at.asc"}) or []
 
 def supabase_save(table, data):
     if not st.session_state.get('user'): return None
     data.pop('id', None)
     data['user_id'] = st.session_state.user.id
-    try:
-        res = supabase.table(table).insert(data).execute()
-        return res.data[0] if res.data else data
-    except Exception as e:
-        st.error(f"Error al guardar: {e}")
-        return None
+    res = _supabase_req("POST", table, data=data)
+    return res[0] if res else None
 
 def supabase_delete(table, record_id):
     if not st.session_state.get('user'): return
-    try:
-        supabase.table(table).delete().eq("id", record_id).eq("user_id", st.session_state.user.id).execute()
-    except Exception as e:
-        st.error(f"Error al eliminar: {e}")
+    _supabase_req("DELETE", table, params={"id": f"eq.{record_id}", "user_id": f"eq.{st.session_state.user.id}"})
 
 def supabase_update(table, record_id, data):
     if not st.session_state.get('user'): return
-    try:
-        supabase.table(table).update(data).eq("id", record_id).eq("user_id", st.session_state.user.id).execute()
-    except Exception as e:
-        st.error(f"Error al actualizar: {e}")
+    _supabase_req("PATCH", table, data=data, params={"id": f"eq.{record_id}", "user_id": f"eq.{st.session_state.user.id}"})
 
 @st.cache_data(ttl=120)
 def get(url):
@@ -114,6 +118,7 @@ if 'user' not in st.session_state:
         if session and session.user:
             supabase.auth.set_session(session.access_token, session.refresh_token)
             st.session_state.user = session.user
+            st.session_state._access_token = session.access_token
     except:
         pass
 
@@ -128,6 +133,7 @@ if not st.session_state.user:
                 try:
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.session_state.user = res.user
+                    st.session_state._access_token = res.session.access_token if res.session else None
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -143,8 +149,8 @@ if not st.session_state.user:
 # ── After auth: load user data ──
 def _load_user_settings():
     try:
-        res = supabase.table("user_settings").select("ntfy_topic").eq("user_id", st.session_state.user.id).maybe_single().execute()
-        return (res.data or {}).get('ntfy_topic', '')
+        res = _supabase_req("GET", "user_settings", params={"user_id": f"eq.{st.session_state.user.id}"})
+        return res[0].get('ntfy_topic', '') if res else ''
     except:
         return ''
 
@@ -218,13 +224,9 @@ if ntfy_topic:
         st.sidebar.success("🔔 Push activado", icon="📲")
         if ntfy_topic != st.session_state.get('ntfy_topic', ''):
             st.session_state.ntfy_topic = ntfy_topic
-            try:
-                supabase.table("user_settings").upsert(
-                    {"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic},
-                    on_conflict="user_id"
-                ).execute()
-            except Exception as e:
-                st.sidebar.error(f"Error al guardar push: {e}")
+            _supabase_req("POST", "user_settings",
+                data={"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic},
+                params={"on_conflict": "user_id"})
 
 with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
     st.markdown("""1. Instalá la app: [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) | [iOS](https://apps.apple.com/app/ntfy/id1625396347)
