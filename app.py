@@ -542,20 +542,48 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
     if best_usdt_sell: prices['usdt_ars'] = best_usdt_sell['bid']
     if best_usdc_sell: prices['usdc_ars'] = best_usdc_sell['bid']
 
+    route_pcts = {}
+    if o_venta and mep_compra:
+        route_pcts['ruta_ofi_mep'] = (mep_compra-o_venta)/o_venta*100
+    if o_venta and blue_compra:
+        route_pcts['ruta_ofi_blue'] = (blue_compra-o_venta)/o_venta*100
+    if o_venta and best_usdt_sell and best_usdt_buy:
+        pct = (best_usdt_sell['bid']/best_usdt_buy['ask']-1)*100
+        route_pcts['ruta_ofi_usdt'] = pct
+    if o_venta and best_usdc_sell and best_usdc_usd_rate>0:
+        eff = o_venta * best_usdc_usd_rate
+        pct = (best_usdc_sell['bid']/eff-1)*100
+        route_pcts['ruta_ofi_usdc'] = pct
+    if mep_compra and blue_compra:
+        route_pcts['ruta_mep_blue'] = (blue_compra/mep_compra-1)*100
+
+    all_prices = {**prices, **route_pcts}
+    route_labels = {
+        'ruta_ofi_mep':'🛤️ Oficial → MEP','ruta_ofi_blue':'🛤️ Oficial → Blue',
+        'ruta_ofi_usdt':'🛤️ Oficial → USDT → ARS','ruta_ofi_usdc':'🛤️ Oficial → USDC → ARS',
+        'ruta_mep_blue':'🛤️ MEP → Blue'
+    }
+    price_labels = {
+        'dolar_oficial':'🇺🇸 Dólar Oficial','dolar_blue':'🇺🇸 Blue','dolar_mep':'📈 MEP',
+        'dolar_ccl':'🌎 CCL','usdt_ars':'USDT/ARS','usdc_ars':'USDC/ARS'
+    }
+
     # Add new alert
     with st.form("alert_form"):
         c1,c2 = st.columns(2)
         with c1:
-            alert_type = st.selectbox("Tipo", list(prices.keys()) if prices else ['dolar_oficial'])
-            alert_name = {
-                'dolar_oficial':'🇺🇸 Dólar Oficial','dolar_blue':'🇺🇸 Blue','dolar_mep':'📈 MEP',
-                'dolar_ccl':'🌎 CCL','usdt_ars':'USDT/ARS','usdc_ars':'USDC/ARS'
-            }.get(alert_type, alert_type)
+            alert_type = st.selectbox("Tipo", list(all_prices.keys()) if all_prices else ['dolar_oficial'])
+            is_route = alert_type.startswith('ruta_')
+            alert_name = route_labels.get(alert_type, price_labels.get(alert_type, alert_type))
         with c2:
-            condition = st.selectbox("Condición", ["mayor a","menor a"])
-            alert_price = st.number_input("Precio", value=float(prices.get(alert_type,1500)), step=100.0, format="%.2f")
+            condition_opts = ["mayor a"] if is_route else ["mayor a","menor a"]
+            condition = st.selectbox("Condición", condition_opts, key=f"alert_cond_{alert_type}")
+            default_val = float(route_pcts.get(alert_type, prices.get(alert_type, 1500)))
+            step = 0.1 if is_route else 100.0
+            label = "% mínimo" if is_route else "Precio"
+            alert_price = st.number_input(label, value=default_val, step=step, format="%.2f", key=f"alert_val_{alert_type}")
         if st.form_submit_button("➕ Crear alerta"):
-            current = prices.get(alert_type,0)
+            current = all_prices.get(alert_type, 0)
             triggered = (condition=="mayor a" and current>alert_price) or (condition=="menor a" and current<alert_price and current>0)
             st.session_state.alerts.append({
                 'id':str(uuid.uuid4())[:8],
@@ -563,6 +591,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 'name':alert_name,
                 'condition':condition,
                 'price':alert_price,
+                'is_route':is_route,
                 'triggered':triggered,
                 'created':datetime.now().isoformat()
             })
@@ -579,7 +608,8 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
         triggered_count = 0
         new_triggers = 0
         for a in st.session_state.alerts:
-            current = prices.get(a['type'],0)
+            is_route = a.get('is_route', False)
+            current = all_prices.get(a['type'], 0) if is_route else prices.get(a['type'], 0)
             triggered = (a['condition']=="mayor a" and current>a['price']) or (a['condition']=="menor a" and current<a['price'] and current>0)
             was_fired = a['id'] in st.session_state.alert_fired
             if triggered:
@@ -591,7 +621,10 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                         extra = f" | Mejor USDT: {best_usdt_sell['name']} ${best_usdt_sell['bid']:,.2f}"
                     elif a['type'] == 'usdc_ars' and best_usdc_sell:
                         extra = f" | Mejor USDC: {best_usdc_sell['name']} ${best_usdc_sell['bid']:,.2f}"
-                    msg = f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)}){extra}"
+                    if is_route:
+                        msg = f"🔔 {a['name']}: {current:.2f}% (umbral: {a['price']:.2f}%){extra}"
+                    else:
+                        msg = f"🔔 {a['name']}: {a['condition']} {fmt(a['price'])} (actual: {fmt(current)}){extra}"
                     st.toast(msg)
                     if ntfy_topic:
                         try:
@@ -610,7 +643,10 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 status = "🔔" if triggered else "🔕"
                 st.markdown(f"{status} **{a['name']}**")
             with c2:
-                st.markdown(f"Actual: {fmt(current)} — Alerta: {a['condition']} {fmt(a['price'])}")
+                if is_route:
+                    st.markdown(f"Actual: {current:.2f}% — Umbral: {a['condition']} {a['price']:.2f}%")
+                else:
+                    st.markdown(f"Actual: {fmt(current)} — Alerta: {a['condition']} {fmt(a['price'])}")
             with c3:
                 if st.button("🗑", key=f"del_alert_{a['id']}"):
                     st.session_state.alerts = [x for x in st.session_state.alerts if x['id']!=a['id']]
