@@ -124,20 +124,13 @@ st.sidebar.caption("Actualización automática cada 2-5 min según caché de API
 if st.session_state.pop('_refresh_ok', False):
     st.toast("✅ Datos actualizados", icon="🔄")
 
-col1, col2 = st.sidebar.columns([1, 3])
-with col1:
-    if st.button("🔄", help="Refrescar datos ahora"):
-        st.cache_data.clear()
-        st.session_state._refresh_ok = True
-        st.rerun()
-with col2:
-    refresh_intv = st.select_slider("", options=["Manual", "1 min", "5 min", "15 min"],
-        value="Manual", label_visibility="collapsed")
-    st.caption(f"Auto: {refresh_intv}")
+if st.sidebar.button("🔄", help="Refrescar datos ahora"):
+    st.cache_data.clear()
+    st.session_state._refresh_ok = True
+    st.rerun()
 
-if refresh_intv != "Manual":
-    secs = int(refresh_intv.split()[0]) * 60
-    st.markdown(f'<meta http-equiv="refresh" content="{secs}">', unsafe_allow_html=True)
+# Auto-refresh cada 2 min
+st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
