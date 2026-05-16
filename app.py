@@ -715,7 +715,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 value=default_val, step=step, format="%.2f")
         if st.form_submit_button("➕ Crear alerta"):
             current = all_prices.get(alert_type, 0)
-            triggered = (condition=="mayor a" and current>alert_price) or (condition=="menor a" and current<alert_price and current>0)
+            triggered = (condition=="mayor a" and current>=alert_price) or (condition=="menor a" and current<=alert_price and current>0)
             alert = {
                 'type':alert_type,
                 'name':alert_name,
@@ -742,7 +742,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
         for a in st.session_state.alerts:
             is_route = a.get('is_route', False)
             current = all_prices.get(a['type'], 0) if is_route else prices.get(a['type'], 0)
-            triggered = (a['condition']=="mayor a" and current>a['price']) or (a['condition']=="menor a" and current<a['price'] and current>0)
+            triggered = (a['condition']=="mayor a" and current>=a['price']) or (a['condition']=="menor a" and current<=a['price'] and current>0)
             was_fired = a['id'] in st.session_state.alert_fired
             if triggered:
                 triggered_count += 1
