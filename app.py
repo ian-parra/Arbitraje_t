@@ -153,6 +153,7 @@ with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
 4. ¡Listo! Las alertas te llegan aunque cierres la app""")
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("[☕ Invitame un cafecito](https://cafecito.app/todosumarbitraje)")
 st.sidebar.caption("v1.0 · CambioAR")
 
 # ════════════════════════════════════════
