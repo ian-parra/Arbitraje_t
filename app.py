@@ -111,7 +111,8 @@ if 'user' not in st.session_state:
     st.session_state.user = None
     try:
         session = supabase.auth.get_session()
-        if session:
+        if session and session.user:
+            supabase.auth.set_session(session.access_token, session.refresh_token)
             st.session_state.user = session.user
     except:
         pass
@@ -134,10 +135,7 @@ if not st.session_state.user:
             if st.form_submit_button("📝 Registrarse", use_container_width=True):
                 try:
                     res = supabase.auth.sign_up({"email": email, "password": password})
-                    if res.user:
-                        st.success("Registrado! Revisá tu email para confirmar.")
-                    else:
-                        st.success("Revisá tu email para confirmar el registro.")
+                    st.success("Revisá tu email para confirmar el registro.")
                 except Exception as e:
                     st.error(f"Error: {e}")
     st.stop()
@@ -222,10 +220,11 @@ if ntfy_topic:
             st.session_state.ntfy_topic = ntfy_topic
             try:
                 supabase.table("user_settings").upsert(
-                    {"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic}
+                    {"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic},
+                    on_conflict="user_id"
                 ).execute()
             except Exception as e:
-                st.sidebar.error(f"Error al guardar: {e}")
+                st.sidebar.error(f"Error al guardar push: {e}")
 
 with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
     st.markdown("""1. Instalá la app: [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) | [iOS](https://apps.apple.com/app/ntfy/id1625396347)
@@ -722,7 +721,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
                 'price':alert_price,
                 'is_route':is_route,
                 'triggered':triggered,
-                'created':datetime.now().isoformat()
+                'created_at':datetime.now().isoformat()
             }
             saved = supabase_save("alerts", alert)
             if saved:
