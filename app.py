@@ -714,21 +714,24 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
             alert_price = st.number_input("% de ganancia" if is_route else "Precio (ARS)",
                 value=default_val, step=step, format="%.2f")
         if st.form_submit_button("➕ Crear alerta"):
-            current = all_prices.get(alert_type, 0)
-            triggered = (condition=="mayor a" and current>=alert_price) or (condition=="menor a" and current<=alert_price and current>0)
-            alert = {
-                'type':alert_type,
-                'name':alert_name,
-                'condition':condition,
-                'price':alert_price,
-                'is_route':is_route,
-                'triggered':triggered,
-                'created_at':datetime.now().isoformat()
-            }
-            saved = supabase_save("alerts", alert)
-            if saved:
-                st.session_state.alerts.append(saved)
-                st.rerun()
+            if not ntfy_topic:
+                st.error("Configurá 📲 Push a celular en la sidebar para poder crear alertas", icon="📲")
+            else:
+                current = all_prices.get(alert_type, 0)
+                triggered = (condition=="mayor a" and current>=alert_price) or (condition=="menor a" and current<=alert_price and current>0)
+                alert = {
+                    'type':alert_type,
+                    'name':alert_name,
+                    'condition':condition,
+                    'price':alert_price,
+                    'is_route':is_route,
+                    'triggered':triggered,
+                    'created_at':datetime.now().isoformat()
+                }
+                saved = supabase_save("alerts", alert)
+                if saved:
+                    st.session_state.alerts.append(saved)
+                    st.rerun()
 
     # Track previously triggered for notifications
     if 'alert_fired' not in st.session_state:
