@@ -106,9 +106,15 @@ def calc_vuelta(v):
     pct = gan / v['pesosInicial'] * 100
     return usd, usdc, ars, gan, pct
 
-# ── Auth gate ──
+# ── Auth gate (session persists in browser localStorage via Supabase) ──
 if 'user' not in st.session_state:
     st.session_state.user = None
+    try:
+        session = supabase.auth.get_session()
+        if session:
+            st.session_state.user = session.user
+    except:
+        pass
 
 if not st.session_state.user:
     st.markdown("### 🔐 CambioAR")
@@ -136,11 +142,19 @@ if not st.session_state.user:
                     st.error(f"Error: {e}")
     st.stop()
 
-# ── Load user data from Supabase ──
+# ── After auth: load user data ──
+def _load_user_settings():
+    try:
+        res = supabase.table("user_settings").select("ntfy_topic").eq("user_id", st.session_state.user.id).maybe_single().execute()
+        return (res.data or {}).get('ntfy_topic', '')
+    except:
+        return ''
+
 if 'vueltas' not in st.session_state or st.session_state.get('_user_id') != st.session_state.user.id:
     st.session_state.vueltas = supabase_load("vueltas")
     st.session_state.alerts = supabase_load("alerts")
     st.session_state._user_id = st.session_state.user.id
+    st.session_state.ntfy_topic = _load_user_settings()
 
 # ── Title ──
 st.markdown("""
@@ -174,7 +188,7 @@ st.sidebar.markdown(f"### ⚙️ Configuración  🕐 {_ts.strftime('%H:%M:%S')}
 st.sidebar.caption(f"👤 {user_email}")
 if st.sidebar.button("🚪 Cerrar sesión"):
     supabase.auth.sign_out()
-    for k in ['user','vueltas','alerts','_user_id','alert_fired']:
+    for k in ['user','vueltas','alerts','_user_id','alert_fired','ntfy_topic']:
         st.session_state.pop(k, None)
     st.rerun()
 
@@ -192,8 +206,9 @@ st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
-# ntfy push with validation
+# ntfy push with validation (persisted in user_settings)
 ntfy_topic = st.sidebar.text_input("📲 Push a celular (ntfy.sh)", placeholder="ej: cambioar-juan",
+    value=st.session_state.get('ntfy_topic', ''),
     help="Recibí notificaciones push gratis en tu celular instalando la app ntfy (Android/iOS). Suscribite a un tema y ponelo acá.")
 
 if ntfy_topic:
@@ -203,6 +218,14 @@ if ntfy_topic:
         ntfy_topic = ""
     else:
         st.sidebar.success("🔔 Push activado", icon="📲")
+        if ntfy_topic != st.session_state.get('ntfy_topic', ''):
+            st.session_state.ntfy_topic = ntfy_topic
+            try:
+                supabase.table("user_settings").upsert(
+                    {"user_id": st.session_state.user.id, "ntfy_topic": ntfy_topic}
+                ).execute()
+            except Exception as e:
+                st.sidebar.error(f"Error al guardar: {e}")
 
 with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
     st.markdown("""1. Instalá la app: [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) | [iOS](https://apps.apple.com/app/ntfy/id1625396347)
@@ -704,7 +727,7 @@ Instalá la app, suscribite a un tema y poné el mismo en la sidebar.""")
             saved = supabase_save("alerts", alert)
             if saved:
                 st.session_state.alerts.append(saved)
-            st.rerun()
+                st.rerun()
 
     # Track previously triggered for notifications
     if 'alert_fired' not in st.session_state:

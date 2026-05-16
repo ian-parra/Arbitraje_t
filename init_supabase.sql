@@ -24,8 +24,15 @@ CREATE TABLE alerts (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE user_settings (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  ntfy_topic TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE vueltas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users own their vueltas"
   ON vueltas FOR ALL
@@ -34,5 +41,10 @@ CREATE POLICY "Users own their vueltas"
 
 CREATE POLICY "Users own their alerts"
   ON alerts FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users own their settings"
+  ON user_settings FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
