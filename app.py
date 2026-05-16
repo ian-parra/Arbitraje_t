@@ -153,7 +153,26 @@ with st.sidebar.expander("❓ ¿Cómo instalar ntfy?"):
 4. ¡Listo! Las alertas te llegan aunque cierres la app""")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("[☕ Invitame un cafecito](https://cafecito.app/todosumarbitraje)")
+st.sidebar.markdown("[☕ Invitame un cafecito](https://cafecito.app/todosumarbitraje)", unsafe_allow_html=True)
+st.sidebar.markdown("""
+<style>
+a[href*="cafecito"] {
+  display: block;
+  text-align: center;
+  padding: 10px 16px;
+  border: 2px solid #8b5cf6;
+  border-radius: 12px;
+  color: #8b5cf6;
+  font-weight: 600;
+  text-decoration: none;
+  transition: 0.2s;
+}
+a[href*="cafecito"]:hover {
+  background: #8b5cf6;
+  color: #fff;
+}
+</style>
+""", unsafe_allow_html=True)
 st.sidebar.caption("v1.0 · CambioAR")
 
 # ════════════════════════════════════════
